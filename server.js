@@ -8,14 +8,18 @@ const PORT = process.env.PORT || 3000;
 
 const PUBLIC_URL = process.env.PUBLIC_URL || process.env.RENDER_EXTERNAL_URL || 'https://annnan.vercel.app';
 
+// Trust proxy to get real IP addresses behind services like Render
+app.set('trust proxy', 1);
+
 app.use(cors({ origin: PUBLIC_URL, credentials: true }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 // ══════════════════════════════════════════════════════════
 // 🔑 CHANGE TON MOT DE PASSE ICI (puis redéploye sur Render)
+// Note: Passé en 'let' pour permettre le changement dynamique via l'Admin
 // ══════════════════════════════════════════════════════════
-const CORRECT_PASSWORD = 'slzxseyko.noxa15.'; 
+let CORRECT_PASSWORD = 'slzxseyko.noxa15.'; 
 // ══════════════════════════════════════════════════════════
 
 const sessions = new Map();
@@ -53,7 +57,6 @@ app.use((req, res, next) => {
 // ─── AUTH MIDDLEWARE ───
 function requireSession(req, res, next) {
     const sid = req.cookies[COOKIE_NAME] || req.headers['x-session-id'];
-    // Si la session n'existe pas (ex: après un redémarrage du serveur), on éjecte
     if (!sid || !sessions.has(sid)) {
         if (req.accepts('html')) return res.redirect('/login');
         return res.status(401).json({ error: 'Unauthorized' });
@@ -114,7 +117,8 @@ app.post('/api/login', (req, res) => {
     const { password } = req.body;
     if (password === CORRECT_PASSWORD) {
         const sid = generateSessionId();
-        sessions.set(sid, { createdAt: Date.now() });
+        const ip = req.ip || req.headers['x-forwarded-for'] || 'Unknown';
+        sessions.set(sid, { createdAt: Date.now(), isAdmin: false, ip: ip });
         res.setCookie(COOKIE_NAME, sid, { maxAge: SESSION_TTL / 1000, secure: true });
         return res.json({ success: true });
     }
@@ -127,6 +131,69 @@ app.post('/api/logout', (req, res) => {
     res.clearCookie(COOKIE_NAME);
     res.json({ success: true });
 });
+
+// ══════════════════════════════════════════════════════════
+// 🛡️ ADMIN ROUTES
+// ══════════════════════════════════════════════════════════
+app.post('/api/admin/login', (req, res) => {
+    const { password } = req.body;
+    const sid = req.cookies[COOKIE_NAME];
+    if (password === CORRECT_PASSWORD && sid && sessions.has(sid)) {
+        const session = sessions.get(sid);
+        session.isAdmin = true;
+        sessions.set(sid, session);
+        return res.json({ success: true });
+    }
+    res.status(401).json({ error: 'Invalid password or no active session' });
+});
+
+app.get('/api/admin/sessions', requireSession, (req, res) => {
+    const session = sessions.get(req.sessionId);
+    if (!session || !session.isAdmin) return res.status(403).json({ error: 'Forbidden' });
+    
+    const sessionList = [];
+    for (const [id, s] of sessions.entries()) {
+        sessionList.push({
+            id: id,
+            createdAt: s.createdAt,
+            ip: s.ip || 'Unknown',
+            isAdmin: s.isAdmin || false
+        });
+    }
+    res.json({ sessions: sessionList });
+});
+
+app.post('/api/admin/disconnect', requireSession, (req, res) => {
+    const session = sessions.get(req.sessionId);
+    if (!session || !session.isAdmin) return res.status(403).json({ error: 'Forbidden' });
+    
+    const { sessionId } = req.body;
+    if (sessionId === req.sessionId) {
+        return res.status(400).json({ error: 'Cannot disconnect yourself' });
+    }
+    
+    sessions.delete(sessionId);
+    res.json({ success: true });
+});
+
+app.post('/api/admin/change-password', requireSession, (req, res) => {
+    const session = sessions.get(req.sessionId);
+    if (!session || !session.isAdmin) return res.status(403).json({ error: 'Forbidden' });
+    
+    const { newPassword } = req.body;
+    if (!newPassword || newPassword.length < 4) {
+        return res.status(400).json({ error: 'Password too short' });
+    }
+    
+    // Update global password in memory
+    CORRECT_PASSWORD = newPassword;
+    
+    // Disconnect EVERYONE (including the current admin)
+    sessions.clear();
+    
+    res.json({ success: true, message: 'Password changed and all users disconnected.' });
+});
+// ══════════════════════════════════════════════════════════
 
 // ─── PLAYERS STORE ───
 const players = new Map();
