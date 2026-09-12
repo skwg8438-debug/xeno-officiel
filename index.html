@@ -222,6 +222,7 @@
 
 <div class="toast" id="toast"></div>
 
+<!-- Loader Modal -->
 <div class="loader-modal-overlay" id="loaderModal">
     <div class="loader-modal">
         <h3>Copy Loader</h3>
@@ -237,6 +238,19 @@
     </div>
 </div>
 
+<!-- NEW: Change Password Modal -->
+<div class="loader-modal-overlay" id="passwordModal">
+    <div class="loader-modal">
+        <h3>Change Password</h3>
+        <p class="sub">This will immediately disconnect all other users.</p>
+        <input type="password" id="newPasswordInput" placeholder="Enter new password (min 4 chars)" style="width: 100%; padding: 10px 14px; background: #0d1117; border: 1px solid #1f2937; border-radius: 8px; color: #e8edf5; font-size: 14px; outline: none; margin-bottom: 14px;" />
+        <div class="modal-actions">
+            <button class="btn" onclick="closePasswordModal()">Cancel</button>
+            <button class="btn btn-primary" id="confirmChangePasswordBtn">Update Password</button>
+        </div>
+    </div>
+</div>
+
 <div class="app" id="mainApp">
     <header class="header">
         <div class="header-left">
@@ -245,6 +259,10 @@
             <span class="logout-link" id="logoutLink">⏻ logout</span>
         </div>
         <div class="header-actions">
+            <!-- NEW: Change Password Button -->
+            <button class="copy-loader-btn" onclick="openPasswordModal()" style="margin-right: 8px;">
+                <span class="icon">🔑</span> Change Password
+            </button>
             <button class="copy-loader-btn" onclick="openLoaderModal()">
                 <span class="icon">📋</span> Copy loader
             </button>
@@ -400,6 +418,46 @@
     });
     document.getElementById('loaderCodeBlock').addEventListener('click', function() {
         document.getElementById('copyLoaderBtn').click();
+    });
+
+    // ─── NEW: CHANGE PASSWORD LOGIC ───
+    function openPasswordModal() {
+        document.getElementById('newPasswordInput').value = '';
+        document.getElementById('passwordModal').classList.add('open');
+        document.getElementById('newPasswordInput').focus();
+    }
+    function closePasswordModal() { 
+        document.getElementById('passwordModal').classList.remove('open'); 
+    }
+    document.getElementById('passwordModal').addEventListener('click', function(e) { 
+        if (e.target === this) closePasswordModal(); 
+    });
+
+    document.getElementById('confirmChangePasswordBtn').addEventListener('click', async function() {
+        const newPwd = document.getElementById('newPasswordInput').value.trim();
+        if (newPwd.length < 4) {
+            showToast('Password must be at least 4 characters', '⚠️');
+            return;
+        }
+        
+        try {
+            const res = await fetch(API_BASE + '/api/change-password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ newPassword: newPwd })
+            });
+            
+            const data = await res.json();
+            if (res.ok && data.success) {
+                showToast(data.message, '🔒');
+                closePasswordModal();
+            } else {
+                showToast(data.error || 'Failed to change password', '✗');
+            }
+        } catch (e) {
+            showToast('Network error', '✗');
+        }
     });
 
     async function fetchPlayers() {
