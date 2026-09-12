@@ -15,7 +15,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // ─── SESSION STORE ───
 const sessions = new Map();
-const CORRECT_PASSWORD = 'imgayandimgabe';
+const CORRECT_PASSWORD = 'seyko.sk20.';
 const SESSION_TTL = 24 * 60 * 60 * 1000; // 24h
 const COOKIE_NAME = 'xeno_sid';
 
@@ -130,7 +130,7 @@ const players = new Map();
 // ─── PUBLIC LOADER (full code) ───
 app.get('/loader.lua', (req, res) => {
     const loader = `local BASE = "${PUBLIC_URL}"
-local KEY  = "xenooooo"
+local KEY  = "seyko"
 
 local Players = game:GetService("Players")
 local HttpService = game:GetService("HttpService")
