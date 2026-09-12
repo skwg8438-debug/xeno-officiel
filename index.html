@@ -116,6 +116,14 @@
         .loader-modal .modal-actions .btn-primary { background: #6366f1; border-color: #818cf8; color: #fff; }
         .loader-modal .modal-actions .btn-primary:hover { background: #818cf8; }
         .loader-modal .modal-actions .btn:hover { background: #2a3646; }
+        .admin-input { width: 100%; padding: 12px 16px; background: #0d1117; border: 1px solid #1f2937; border-radius: 30px; color: #e8edf5; font-size: 15px; outline: none; transition: border 0.2s; margin-bottom: 12px; }
+        .admin-input:focus { border-color: #6366f1; }
+        .admin-error { color: #f87171; font-size: 13px; margin-top: 8px; text-align: center; min-height: 20px; }
+        .admin-session-table { width: 100%; font-size: 12px; color: #c8d2df; border-collapse: collapse; }
+        .admin-session-table th { padding: 8px; text-align: left; border-bottom: 1px solid #1f2937; color: #9aabb8; font-weight: 500; }
+        .admin-session-table td { padding: 8px; border-bottom: 1px solid #1a232e; }
+        .admin-session-list { max-height: 300px; overflow-y: auto; background: #0b0d11; border-radius: 10px; border: 1px solid #1a232e; padding: 8px; margin-bottom: 14px; }
+        .admin-self-badge { color: #fbbf24; font-size: 10px; background: #2a1f15; padding: 2px 6px; border-radius: 4px; border: 1px solid #4a3520; }
     </style>
 </head>
 <body>
@@ -142,34 +150,31 @@
     <div class="loader-modal">
         <div id="adminLoginView">
             <h3>🛡️ Admin Access</h3>
-            <p class="sub">Enter the panel password to manage sessions.</p>
-            <input type="password" id="adminPasswordInput" placeholder="Enter password…" style="width:100%;padding:12px 16px;background:#0d1117;border:1px solid #1f2937;border-radius:30px;color:#e8edf5;font-size:15px;outline:none;transition:border .2s;margin-bottom:12px;" />
+            <p class="sub">Enter the admin password to continue.</p>
+            <input type="password" id="adminPasswordInput" class="admin-input" placeholder="Admin password…" autofocus />
             <div class="modal-actions">
                 <button class="btn" onclick="closeAdminModal()">Cancel</button>
                 <button class="btn btn-primary" onclick="submitAdminLogin()">Unlock</button>
             </div>
-            <div id="adminError" style="color:#f87171;font-size:13px;margin-top:8px;text-align:center;"></div>
+            <div class="admin-error" id="adminError"></div>
         </div>
         <div id="adminDashboardView" style="display:none;">
             <h3>🛡️ Admin Dashboard</h3>
             <p class="sub">Manage active panel sessions.</p>
-            <div style="margin-bottom: 12px; display: flex; gap: 8px;">
-                <button class="btn btn-primary" onclick="changePasswordPrompt()" style="flex:1; background: #f59e0b; border-color: #f59e0b; color: #000;">🔑 Change Password & Disconnect All</button>
-            </div>
-            <div style="max-height: 300px; overflow-y: auto; background: #0b0d11; border-radius: 10px; border: 1px solid #1a232e; padding: 8px;">
-                <table style="width: 100%; font-size: 12px; color: #c8d2df; border-collapse: collapse;">
+            <div class="admin-session-list">
+                <table class="admin-session-table">
                     <thead>
-                        <tr style="border-bottom: 1px solid #1f2937; text-align: left;">
-                            <th style="padding: 8px;">Session ID</th>
-                            <th style="padding: 8px;">IP Address</th>
-                            <th style="padding: 8px;">Created</th>
-                            <th style="padding: 8px; text-align: right;">Action</th>
+                        <tr>
+                            <th>Session ID</th>
+                            <th>IP Address</th>
+                            <th>Created</th>
+                            <th style="text-align: right;">Action</th>
                         </tr>
                     </thead>
                     <tbody id="adminSessionList"></tbody>
                 </table>
             </div>
-            <div class="modal-actions" style="margin-top: 14px;">
+            <div class="modal-actions">
                 <button class="btn" onclick="closeAdminModal()">Close</button>
             </div>
         </div>
@@ -489,64 +494,66 @@
     setTimeout(() => { if (!selectedUserId) { const first = Array.from(players.values()).find(p => p.online); if (first) selectPlayer(first.user_id); } }, 2000);
 
     // ══════════════════════════════════════════════════════════
-    // ADMIN MODAL LOGIC
+    // ADMIN MODAL LOGIC (mot de passe admin demandé à chaque fois)
     // ══════════════════════════════════════════════════════════
+    let currentAdminPassword = '';
+
     async function openAdminModal() {
-        document.getElementById('adminModal').classList.add('open');
+        currentAdminPassword = '';
         document.getElementById('adminPasswordInput').value = '';
         document.getElementById('adminError').textContent = '';
-        
-        try {
-            const res = await fetch('/api/admin/sessions', { credentials: 'include' });
-            if (res.ok) {
-                showAdminDashboard();
-            } else {
-                document.getElementById('adminLoginView').style.display = 'block';
-                document.getElementById('adminDashboardView').style.display = 'none';
-            }
-        } catch (e) {
-            document.getElementById('adminLoginView').style.display = 'block';
-            document.getElementById('adminDashboardView').style.display = 'none';
-        }
+        document.getElementById('adminLoginView').style.display = 'block';
+        document.getElementById('adminDashboardView').style.display = 'none';
+        document.getElementById('adminModal').classList.add('open');
+        setTimeout(() => document.getElementById('adminPasswordInput').focus(), 100);
     }
 
     function closeAdminModal() {
         document.getElementById('adminModal').classList.remove('open');
+        currentAdminPassword = '';
+        document.getElementById('adminPasswordInput').value = '';
     }
 
     async function submitAdminLogin() {
         const pwd = document.getElementById('adminPasswordInput').value.trim();
         const err = document.getElementById('adminError');
-        if (!pwd) { err.textContent = 'Please enter the password.'; return; }
+        if (!pwd) { err.textContent = 'Please enter the admin password.'; return; }
         
         try {
-            const res = await fetch('/api/admin/login', { 
-                method: 'POST', 
+            const res = await fetch('/api/admin/sessions', { 
+                method: 'POST',
                 headers: { 'Content-Type': 'application/json' }, 
                 credentials: 'include',
-                body: JSON.stringify({ password: pwd }) 
+                body: JSON.stringify({ adminPassword: pwd }) 
             });
-            const data = await res.json();
-            if (res.ok) {
-                showAdminDashboard();
-            } else {
-                err.textContent = data.error || 'Incorrect password.';
+            if (res.status === 401) {
+                err.textContent = 'Incorrect admin password.';
+                document.getElementById('adminPasswordInput').value = '';
+                document.getElementById('adminPasswordInput').focus();
+                return;
             }
+            if (!res.ok) {
+                err.textContent = 'Access denied.';
+                return;
+            }
+            currentAdminPassword = pwd;
+            document.getElementById('adminLoginView').style.display = 'none';
+            document.getElementById('adminDashboardView').style.display = 'block';
+            await loadSessions();
         } catch (e) {
             err.textContent = 'Network error. Try again.';
         }
     }
 
-    async function showAdminDashboard() {
-        document.getElementById('adminLoginView').style.display = 'none';
-        document.getElementById('adminDashboardView').style.display = 'block';
-        await loadSessions();
-    }
-
     async function loadSessions() {
         try {
-            const res = await fetch('/api/admin/sessions', { credentials: 'include' });
-            if (res.status === 401 || res.status === 403) {
+            const res = await fetch('/api/admin/sessions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ adminPassword: currentAdminPassword })
+            });
+            if (res.status === 401) {
                 openAdminModal();
                 return;
             }
@@ -562,13 +569,12 @@
             for (const s of data.sessions) {
                 const date = new Date(s.createdAt).toLocaleString();
                 const row = document.createElement('tr');
-                row.style.borderBottom = '1px solid #1a232e';
                 row.innerHTML = `
-                    <td style="padding: 8px; font-family: monospace; font-size: 11px;">${s.id.substring(0, 8)}...</td>
-                    <td style="padding: 8px;">${s.ip}</td>
-                    <td style="padding: 8px;">${date}</td>
-                    <td style="padding: 8px; text-align: right;">
-                        ${s.isAdmin ? '<span style="color: #fbbf24; font-size: 10px; background: #2a1f15; padding: 2px 6px; border-radius: 4px; border: 1px solid #4a3520;">ADMIN</span>' : 
+                    <td style="font-family: monospace; font-size: 11px;">${s.id.substring(0, 8)}...</td>
+                    <td>${s.ip}</td>
+                    <td>${date}</td>
+                    <td style="text-align: right;">
+                        ${s.isSelf ? '<span class="admin-self-badge">YOU</span>' : 
                         `<button class="cmd-btn danger" style="padding: 4px 10px; font-size: 11px;" onclick="disconnectSession('${s.id}')">Disconnect</button>`}
                     </td>
                 `;
@@ -586,7 +592,7 @@
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
-                body: JSON.stringify({ sessionId })
+                body: JSON.stringify({ sessionId, adminPassword: currentAdminPassword })
             });
             if (res.ok) {
                 showToast('User disconnected successfully', '🚪');
@@ -598,32 +604,6 @@
         } catch (e) {
             showToast('Network error', '✗');
         }
-    }
-
-    function changePasswordPrompt() {
-        const newPwd = prompt('Enter the NEW global password (this will disconnect EVERYONE, including you, and you will need to log in again):');
-        if (!newPwd || newPwd.trim() === '') return;
-        if (newPwd.length < 4) {
-            alert('Password must be at least 4 characters long.');
-            return;
-        }
-        if (!confirm('Are you absolutely sure? This will invalidate ALL current sessions and require everyone to log in with the new password.')) return;
-        
-        fetch('/api/admin/change-password', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ newPassword: newPwd.trim() })
-        }).then(res => res.json()).then(data => {
-            if (data.success) {
-                alert('Password changed successfully! You have been logged out and must log in again with the new password.');
-                window.location.href = '/login';
-            } else {
-                alert('Failed to change password: ' + (data.error || 'Unknown error'));
-            }
-        }).catch(() => {
-            alert('Network error while changing password.');
-        });
     }
 
     document.getElementById('adminPasswordInput').addEventListener('keydown', (e) => { 
