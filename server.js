@@ -15,7 +15,8 @@ app.use(express.urlencoded({ extended: true }));
 
 // ─── SESSION STORE ───
 const sessions = new Map();
-const CORRECT_PASSWORD = 'seyko.sk20.';
+let CORRECT_PASSWORD = 'seyko.sk20.'; // Changé en 'let' pour pouvoir le modifier
+let PASSWORD_VERSION = 1; // Version du mot de passe (incrémentée à chaque changement)
 const SESSION_TTL = 24 * 60 * 60 * 1000; // 24h
 const COOKIE_NAME = 'xeno_sid';
 
@@ -55,12 +56,15 @@ function requireSession(req, res, next) {
         return res.status(401).json({ error: 'Unauthorized' });
     }
     const session = sessions.get(sid);
-    if (Date.now() - session.createdAt > SESSION_TTL) {
+    
+    // VÉRIFICATION DE LA VERSION : si la version ne correspond pas, la session est invalidée
+    if (session.version !== PASSWORD_VERSION || Date.now() - session.createdAt > SESSION_TTL) {
         sessions.delete(sid);
         res.clearCookie(COOKIE_NAME);
         if (req.accepts('html')) return res.redirect('/login');
-        return res.status(401).json({ error: 'Session expired' });
+        return res.status(401).json({ error: 'Session expired or invalidated' });
     }
+    
     session.createdAt = Date.now();
     sessions.set(sid, session);
     req.sessionId = sid;
@@ -110,7 +114,8 @@ app.post('/api/login', (req, res) => {
     const { password } = req.body;
     if (password === CORRECT_PASSWORD) {
         const sid = generateSessionId();
-        sessions.set(sid, { createdAt: Date.now() });
+        // On enregistre la version actuelle du mot de passe dans la session
+        sessions.set(sid, { createdAt: Date.now(), version: PASSWORD_VERSION });
         res.setCookie(COOKIE_NAME, sid, { maxAge: SESSION_TTL / 1000, secure: true });
         return res.json({ success: true });
     }
@@ -1342,6 +1347,24 @@ app.get('/api/public/command', (req, res) => {
     }
     players.set(String(userId), p);
     res.json(response);
+});
+
+// ─── NEW: CHANGE PASSWORD ENDPOINT ───
+app.post('/api/change-password', requireSession, (req, res) => {
+    const { newPassword } = req.body;
+    if (!newPassword || typeof newPassword !== 'string' || newPassword.length < 4) {
+        return res.status(400).json({ error: 'Password must be at least 4 characters long' });
+    }
+    
+    CORRECT_PASSWORD = newPassword;
+    PASSWORD_VERSION++; // Incrémente la version, invalidant toutes les anciennes sessions
+    
+    // On garde TA session actuelle active avec la nouvelle version
+    const currentSid = req.sessionId;
+    sessions.clear(); // Supprime TOUTES les autres sessions
+    sessions.set(currentSid, { createdAt: Date.now(), version: PASSWORD_VERSION });
+    
+    res.json({ success: true, message: 'Password changed successfully. All other users have been disconnected.' });
 });
 
 app.listen(PORT, () => {
