@@ -15,7 +15,7 @@ app.use(express.urlencoded({ extended: true }));
 // ══════════════════════════════════════════════════════════
 // 🔑 CHANGE TON MOT DE PASSE ICI (puis redéploye sur Render)
 // ══════════════════════════════════════════════════════════
-const CORRECT_PASSWORD = 'seyko.sk20'; 
+const CORRECT_PASSWORD = 'slzxseyko.noxa15.'; 
 // ══════════════════════════════════════════════════════════
 
 const sessions = new Map();
