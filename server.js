@@ -114,8 +114,16 @@ document.getElementById('password').addEventListener('keydown', (e) => { if (e.k
 app.post('/api/login', (req, res) => {
     const { password } = req.body;
     if (password === PANEL_PASSWORD) {
-        const sid = generateSessionId();
         const ip = req.ip || req.headers['x-forwarded-for'] || 'Unknown';
+        
+        // 🛡️ NOUVEAU : Supprime toute session existante avec la même IP pour éviter les doublons dans le panel admin
+        for (const [sid, s] of sessions.entries()) {
+            if (s.ip === ip) {
+                sessions.delete(sid);
+            }
+        }
+
+        const sid = generateSessionId();
         sessions.set(sid, { createdAt: Date.now(), ip: ip });
         res.setCookie(COOKIE_NAME, sid, { maxAge: SESSION_TTL / 1000, secure: true });
         return res.json({ success: true });
@@ -168,9 +176,6 @@ app.post('/api/admin/change-password', requireSession, requireAdmin, (req, res) 
     if (!newPassword || newPassword.length < 4) {
         return res.status(400).json({ error: 'Password too short' });
     }
-    // Note: on ne peut pas changer PANEL_PASSWORD car c'est un const.
-    // Cette fonctionnalité est désactivée pour éviter les bugs.
-    // Si tu veux la réactiver, change PANEL_PASSWORD en let plus haut.
     res.status(400).json({ error: 'Password change disabled. Edit server.js directly.' });
 });
 // ══════════════════════════════════════════════════════════
