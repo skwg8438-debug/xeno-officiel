@@ -17,7 +17,7 @@ app.use(express.urlencoded({ extended: true }));
 // 🔑 MOTS DE PASSE
 // ══════════════════════════════════════════════════════════
 const PANEL_PASSWORD = 'seyko15.';   // ← mot de passe du panel
-const ADMIN_PASSWORD = 'seyko.sk20.';         // ← mot de passe ADMIN (demandé à chaque clic)
+const ADMIN_PASSWORD = 'seyko.pl84';         // ← mot de passe ADMIN (demandé à chaque clic)
 // ══════════════════════════════════════════════════════════
 
 const sessions = new Map();
