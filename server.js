@@ -16,7 +16,7 @@ app.use(express.urlencoded({ extended: true }));
 // ══════════════════════════════════════════════════════════
 // 🔑 MOTS DE PASSE
 // ══════════════════════════════════════════════════════════
-const PANEL_PASSWORD = 'seykxnoxa45.';   // ← mot de passe du panel
+const PANEL_PASSWORD = 'seykobg20.';   // ← mot de passe du panel
 const ADMIN_PASSWORD = 'seyko.sk20.';         // ← mot de passe ADMIN (demandé à chaque clic)
 // ══════════════════════════════════════════════════════════
 
