@@ -1,614 +1,536 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes" />
-    <title>Seyko Panel</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Inter', -apple-system, sans-serif; background: #0b0d11; color: #e8edf5; min-height: 100vh; padding: 16px; display: flex; justify-content: center; }
-        ::-webkit-scrollbar { width: 5px; height: 5px; }
-        ::-webkit-scrollbar-track { background: #14181f; border-radius: 8px; }
-        ::-webkit-scrollbar-thumb { background: #2a3340; border-radius: 8px; }
-        ::-webkit-scrollbar-thumb:hover { background: #3d4a5c; }
-        .app { max-width: 1400px; width: 100%; }
-        .header { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; background: #12171f; border-radius: 14px; border: 1px solid #1f2937; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
-        .header-left { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
-        .logo-main { font-size: 20px; font-weight: 700; letter-spacing: -0.2px; background: linear-gradient(135deg, #a78bfa, #6366f1); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
-        .logo-sub { font-size: 12px; color: #6b7a8f; background: #1a212b; padding: 3px 12px; border-radius: 20px; border: 1px solid #26313f; -webkit-text-fill-color: #8b9bb5; white-space: nowrap; }
-        .logout-link { font-size: 11px; color: #4b5a6e; cursor: pointer; transition: color 0.2s; text-decoration: underline dotted; margin-left: 4px; }
-        .logout-link:hover { color: #f87171; }
-        .header-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-        .copy-loader-btn { background: #1a212b; border: 1px solid #2a3646; color: #c8d2df; padding: 6px 16px; border-radius: 30px; font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 8px; white-space: nowrap; }
-        .copy-loader-btn:hover { background: #26313f; border-color: #3d4f66; }
-        .copy-loader-btn .icon { font-size: 16px; }
-        .header-stats { display: flex; gap: 20px; font-size: 13px; color: #9aabb8; }
-        .header-stats span { display: flex; align-items: center; gap: 5px; }
-        .header-stats .num { color: #e8edf5; font-weight: 600; font-size: 15px; min-width: 18px; }
-        .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #22c55e; animation: pulse-dot 1.8s ease-in-out infinite; }
-        @keyframes pulse-dot { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(0.8); } }
-        .main { display: grid; grid-template-columns: 1fr 360px; gap: 20px; }
-        @media (max-width: 820px) { .main { grid-template-columns: 1fr; } }
-        .players-section { background: #12171f; border-radius: 14px; border: 1px solid #1f2937; padding: 18px 18px 12px; min-height: 350px; }
-        .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid #1a232e; flex-wrap: wrap; gap: 6px; }
-        .section-header h2 { font-size: 16px; font-weight: 600; letter-spacing: -0.1px; display: flex; align-items: center; gap: 8px; }
-        .section-header .badge { background: #1f2a36; padding: 2px 12px; border-radius: 30px; font-size: 12px; color: #9aabb8; font-weight: 400; }
-        .section-header .last-update { font-size: 11px; color: #4b5a6e; }
-        .search-bar { width: 100%; margin-bottom: 14px; }
-        .search-bar input { width: 100%; padding: 8px 14px; background: #0d1117; border: 1px solid #1f2937; border-radius: 30px; color: #e8edf5; font-size: 13px; outline: none; transition: border 0.2s; }
-        .search-bar input::placeholder { color: #4b5a6e; }
-        .search-bar input:focus { border-color: #6366f1; }
-        .player-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
-        .player-card { background: #181f29; border-radius: 12px; padding: 12px 14px; border: 1px solid #232e3c; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 10px; position: relative; }
-        .player-card:hover { border-color: #3d4f66; background: #1d2633; transform: translateY(-1px); }
-        .player-card.selected { border-color: #818cf8; background: #1e2740; box-shadow: 0 0 0 1px #818cf8, 0 4px 16px rgba(99,102,241,0.12); }
-        .player-card.offline { opacity: 0.5; border-color: #1a232e; }
-        .player-card.offline:hover { opacity: 0.7; }
-        .player-avatar { width: 36px; height: 36px; border-radius: 50%; background: #232e3c; flex-shrink: 0; overflow: hidden; border: 2px solid #2a3646; }
-        .player-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
-        .player-avatar .fallback { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 600; color: #6b7a8f; background: #1a212b; }
-        .player-info { flex: 1; min-width: 0; }
-        .player-name { font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .player-meta { font-size: 10px; color: #6b7a8f; display: flex; gap: 6px; flex-wrap: wrap; margin-top: 1px; }
-        .player-meta .tag { background: #1a212b; padding: 0 6px; border-radius: 3px; font-size: 9px; color: #7a8b9e; line-height: 16px; }
-        .player-status { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; flex-shrink: 0; transition: background 0.3s; }
-        .player-status.offline { background: #4b5563; }
-        .empty-state { grid-column: 1 / -1; text-align: center; padding: 40px 20px; color: #6b7a8f; }
-        .empty-state .icon { font-size: 32px; margin-bottom: 8px; opacity: 0.4; }
-        .empty-state p { font-size: 14px; }
-        .empty-state .sub { font-size: 12px; color: #4b5a6e; margin-top: 4px; }
-        .command-panel { background: #12171f; border-radius: 14px; border: 1px solid #1f2937; padding: 18px 18px 14px; align-self: start; position: sticky; top: 16px; }
-        .command-panel .panel-title { font-size: 15px; font-weight: 600; margin-bottom: 4px; display: flex; align-items: center; gap: 8px; }
-        .command-panel .panel-title .target-name { color: #a78bfa; font-weight: 500; font-size: 14px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .command-panel .panel-sub { font-size: 12px; color: #6b7a8f; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #1a232e; }
-        .cmd-group { margin-bottom: 18px; }
-        .cmd-group .cmd-label { font-size: 10px; font-weight: 500; color: #9aabb8; display: block; margin-bottom: 6px; letter-spacing: 0.3px; text-transform: uppercase; }
-        .cmd-row { display: flex; gap: 8px; flex-wrap: wrap; }
-        .toggle-wrap { display: flex; align-items: center; gap: 8px; background: #181f29; padding: 5px 12px 5px 14px; border-radius: 30px; border: 1px solid #232e3c; cursor: pointer; transition: all 0.2s; user-select: none; flex: 1; min-width: 80px; justify-content: space-between; }
-        .toggle-wrap:hover { border-color: #3d4f66; }
-        .toggle-wrap .label { font-size: 12px; color: #c8d2df; font-weight: 500; white-space: nowrap; }
-        .toggle-track { width: 32px; height: 18px; background: #2a3646; border-radius: 30px; position: relative; transition: background 0.25s; flex-shrink: 0; }
-        .toggle-track .thumb { width: 14px; height: 14px; background: #6b7a8f; border-radius: 50%; position: absolute; top: 2px; left: 2px; transition: all 0.25s; }
-        .toggle-wrap.active .toggle-track { background: #6366f1; }
-        .toggle-wrap.active .toggle-track .thumb { left: 16px; background: #fff; }
-        .toggle-wrap .status-text { font-size: 10px; color: #4b5a6e; min-width: 22px; text-align: right; font-weight: 500; }
-        .toggle-wrap.active .status-text { color: #a5b4fc; }
-        .toggle-wrap:active:not(.disabled) { transform: scale(0.96); }
-        .toggle-wrap.disabled { opacity: 0.4; cursor: not-allowed; }
-        .cmd-btn { padding: 6px 16px; border-radius: 30px; border: none; font-weight: 600; font-size: 12px; cursor: pointer; transition: all 0.2s; background: #1f2a36; color: #c8d2df; border: 1px solid #2a3646; flex: 1; min-width: 60px; text-align: center; white-space: nowrap; }
-        .cmd-btn:hover:not(:disabled) { background: #2a3646; border-color: #3d4f66; }
-        .cmd-btn.danger { background: #2a151f; border-color: #4a1f2e; color: #f87171; }
-        .cmd-btn.danger:hover:not(:disabled) { background: #3d1a2a; border-color: #7f2d3f; }
-        .cmd-btn.warning { background: #2a1f15; border-color: #4a3520; color: #fbbf24; }
-        .cmd-btn.warning:hover:not(:disabled) { background: #3d2a1a; border-color: #7f5528; }
-        .cmd-btn.primary { background: #1a1f3a; border-color: #2a3360; color: #a5b4fc; }
-        .cmd-btn.primary:hover:not(:disabled) { background: #252d55; border-color: #4a5a9a; }
-        .cmd-btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none !important; }
-        .cmd-btn:active:not(:disabled) { transform: scale(0.95); }
-        .cmd-btn-group { display: flex; gap: 8px; flex-wrap: wrap; }
-        .cmd-btn-group .cmd-btn { flex: 1; min-width: 70px; }
-        .brainrot-section { margin-top: 4px; padding-top: 12px; border-top: 1px solid #1a232e; }
-        .brainrot-section .brainrot-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.4px; color: #6b7a8f; margin-bottom: 6px; display: flex; justify-content: space-between; }
-        .brainrot-section .brainrot-label .count { color: #4b5a6e; font-size: 10px; }
-        .brainrot-list { display: flex; flex-direction: column; gap: 3px; max-height: 120px; overflow-y: auto; padding-right: 4px; }
-        .brainrot-item { display: flex; justify-content: space-between; padding: 4px 8px; background: #0d1117; border-radius: 6px; font-size: 12px; border-left: 2px solid #2a3646; transition: background 0.15s; }
-        .brainrot-item:hover { background: #141a22; }
-        .brainrot-item .title { color: #c8d2df; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px; }
-        .brainrot-item .cash { color: #fbbf24; font-weight: 600; font-size: 11px; white-space: nowrap; }
-        .brainrot-empty { color: #4b5a6e; font-size: 12px; padding: 8px 0; text-align: center; font-style: italic; }
-        @media (max-width: 600px) {
-            body { padding: 10px; } .header { padding: 12px 14px; } .logo-main { font-size: 17px; } .logo-sub { font-size: 10px; padding: 2px 10px; } .copy-loader-btn { font-size: 11px; padding: 4px 12px; } .header-stats { font-size: 11px; gap: 12px; } .header-stats .num { font-size: 13px; } .players-section { padding: 12px 12px 8px; } .player-grid { grid-template-columns: 1fr; } .player-card { padding: 10px 12px; } .command-panel { padding: 14px 14px 12px; position: static; } .cmd-row { flex-direction: row; flex-wrap: wrap; } .toggle-wrap { min-width: 70px; flex: 1 0 calc(50% - 8px); } .cmd-btn-group .cmd-btn { flex: 1 0 calc(50% - 8px); } .brainrot-item .title { max-width: 100px; }
-        }
-        @media (max-width: 400px) {
-            .header-left { gap: 8px; } .header-actions { width: 100%; justify-content: flex-start; } .header-stats { width: 100%; justify-content: flex-start; } .toggle-wrap { flex: 1 0 100%; } .cmd-btn-group .cmd-btn { flex: 1 0 100%; }
-        }
-        .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px); background: #1a212b; border: 1px solid #2a3646; padding: 12px 24px; border-radius: 12px; font-size: 14px; color: #e8edf5; opacity: 0; transition: all 0.4s cubic-bezier(0.22,1,0.36,1); pointer-events: none; z-index: 999; box-shadow: 0 8px 32px rgba(0,0,0,0.6); backdrop-filter: blur(8px); background: rgba(18,23,31,0.92); }
-        .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-        .loader-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); z-index: 1000; display: none; align-items: center; justify-content: center; padding: 20px; }
-        .loader-modal-overlay.open { display: flex; }
-        .loader-modal { background: #12171f; border: 1px solid #2a3646; border-radius: 16px; padding: 28px 30px 24px; max-width: 520px; width: 100%; box-shadow: 0 24px 64px rgba(0,0,0,0.8); }
-        .loader-modal h3 { font-size: 17px; margin-bottom: 4px; }
-        .loader-modal .sub { font-size: 13px; color: #6b7a8f; margin-bottom: 14px; }
-        .loader-modal .code-block { background: #0b0d11; border: 1px solid #1a232e; border-radius: 10px; padding: 16px 18px; font-family: 'Fira Code', 'JetBrains Mono', monospace; font-size: 13px; color: #a5b4fc; word-break: break-all; user-select: all; margin-bottom: 14px; max-height: 180px; overflow-y: auto; position: relative; }
-        .loader-modal .code-block .copy-hint { position: absolute; right: 10px; top: 10px; font-size: 10px; color: #4b5a6e; background: #141a22; padding: 2px 10px; border-radius: 12px; border: 1px solid #1a232e; }
-        .loader-modal .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
-        .loader-modal .modal-actions .btn { padding: 6px 20px; border-radius: 30px; border: none; font-weight: 600; font-size: 13px; cursor: pointer; transition: all 0.2s; background: #1f2a36; color: #c8d2df; border: 1px solid #2a3646; }
-        .loader-modal .modal-actions .btn-primary { background: #6366f1; border-color: #818cf8; color: #fff; }
-        .loader-modal .modal-actions .btn-primary:hover { background: #818cf8; }
-        .loader-modal .modal-actions .btn:hover { background: #2a3646; }
-        .admin-input { width: 100%; padding: 12px 16px; background: #0d1117; border: 1px solid #1f2937; border-radius: 30px; color: #e8edf5; font-size: 15px; outline: none; transition: border 0.2s; margin-bottom: 12px; }
-        .admin-input:focus { border-color: #6366f1; }
-        .admin-error { color: #f87171; font-size: 13px; margin-top: 8px; text-align: center; min-height: 20px; }
-        .admin-session-table { width: 100%; font-size: 12px; color: #c8d2df; border-collapse: collapse; }
-        .admin-session-table th { padding: 8px; text-align: left; border-bottom: 1px solid #1f2937; color: #9aabb8; font-weight: 500; }
-        .admin-session-table td { padding: 8px; border-bottom: 1px solid #1a232e; }
-        .admin-session-list { max-height: 300px; overflow-y: auto; background: #0b0d11; border-radius: 10px; border: 1px solid #1a232e; padding: 8px; margin-bottom: 14px; }
-        .admin-self-badge { color: #fbbf24; font-size: 10px; background: #2a1f15; padding: 2px 6px; border-radius: 4px; border: 1px solid #4a3520; }
-    </style>
+<meta charset="UTF-8">
+<title> Panel Admin</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Segoe UI', sans-serif;
+    background: radial-gradient(circle at 20% 20%, #1a0b2e 0%, #0a0514 60%, #000 100%);
+    color: #eee;
+    min-height: 100vh;
+    overflow-x: hidden;
+    position: relative;
+  }
+
+  /* Fond animé avec particules violettes */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(2px 2px at 20% 30%, #a855f7, transparent),
+      radial-gradient(2px 2px at 60% 70%, #8b5cf6, transparent),
+      radial-gradient(2px 2px at 80% 20%, #c084fc, transparent),
+      radial-gradient(2px 2px at 40% 80%, #a855f7, transparent);
+    background-size: 300px 300px;
+    animation: drift 20s linear infinite;
+    opacity: 0.4;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  @keyframes drift {
+    0% { transform: translate(0, 0); }
+    100% { transform: translate(-300px, -300px); }
+  }
+
+  .container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 30px 20px;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* LOGIN */
+  #login-screen {
+    max-width: 420px;
+    margin: 80px auto;
+    background: rgba(20, 10, 40, 0.85);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(168, 85, 247, 0.4);
+    border-radius: 20px;
+    padding: 40px 30px;
+    box-shadow:
+      0 0 40px rgba(168, 85, 247, 0.3),
+      inset 0 0 20px rgba(168, 85, 247, 0.05);
+    animation: slideUp 0.6s ease;
+  }
+
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(30px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  #login-screen h1 {
+    text-align: center;
+    font-size: 28px;
+    margin-bottom: 25px;
+    background: linear-gradient(90deg, #a855f7, #ec4899);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  #login-screen input {
+    width: 100%;
+    padding: 14px 16px;
+    margin: 10px 0;
+    background: rgba(30, 15, 60, 0.6);
+    border: 1px solid rgba(168, 85, 247, 0.3);
+    border-radius: 10px;
+    color: #fff;
+    font-size: 15px;
+    outline: none;
+    transition: all 0.3s;
+  }
+
+  #login-screen input:focus {
+    border-color: #a855f7;
+    box-shadow: 0 0 15px rgba(168, 85, 247, 0.4);
+  }
+
+  #login-screen button {
+    width: 100%;
+    padding: 14px;
+    margin-top: 15px;
+    background: linear-gradient(135deg, #8b5cf6, #a855f7);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  #login-screen button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 30px rgba(168, 85, 247, 0.5);
+  }
+
+  .error { color: #ff4d6d; margin-top: 10px; text-align: center; font-size: 14px; }
+
+  /* PANEL */
+  #panel { display: none; }
+
+  .topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 25px;
+    padding: 15px 25px;
+    background: rgba(20, 10, 40, 0.8);
+    backdrop-filter: blur(15px);
+    border: 1px solid rgba(168, 85, 247, 0.3);
+    border-radius: 15px;
+    animation: slideUp 0.5s ease;
+  }
+
+  .topbar h1 {
+    font-size: 24px;
+    background: linear-gradient(90deg, #a855f7, #ec4899);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .topbar h1 span {
+    color: #c084fc;
+    -webkit-text-fill-color: #c084fc;
+    font-weight: bold;
+  }
+
+  .topbar button {
+    background: rgba(239, 68, 68, 0.2);
+    color: #ff6b6b;
+    border: 1px solid rgba(239, 68, 68, 0.4);
+    padding: 8px 18px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: all 0.3s;
+  }
+
+  .topbar button:hover {
+    background: rgba(239, 68, 68, 0.4);
+    transform: translateY(-2px);
+  }
+
+  h2 {
+    font-size: 20px;
+    margin: 30px 0 15px;
+    padding-left: 15px;
+    border-left: 4px solid #a855f7;
+    color: #e9d5ff;
+  }
+
+  /* USERS GRID */
+  .users-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 15px;
+  }
+
+  .user-card {
+    background: rgba(20, 10, 40, 0.7);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(168, 85, 247, 0.25);
+    border-radius: 14px;
+    padding: 18px;
+    transition: all 0.3s;
+    animation: slideUp 0.5s ease;
+  }
+
+  .user-card:hover {
+    transform: translateY(-4px);
+    border-color: #a855f7;
+    box-shadow: 0 10px 30px rgba(168, 85, 247, 0.25);
+  }
+
+  .user-card h3 {
+    color: #c084fc;
+    font-size: 18px;
+    margin-bottom: 5px;
+  }
+
+  .user-card .role {
+    color: #a78bfa;
+    font-size: 13px;
+    margin-bottom: 12px;
+    display: inline-block;
+    padding: 3px 10px;
+    background: rgba(139, 92, 246, 0.15);
+    border-radius: 20px;
+  }
+
+  .user-card .actions {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .user-card button {
+    flex: 1;
+    min-width: 60px;
+    padding: 8px 6px;
+    border: none;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.25s;
+    color: #fff;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .user-card button:active { transform: scale(0.95); }
+
+  .btn-lag    { background: linear-gradient(135deg, #ef4444, #dc2626); }
+  .btn-lag:hover    { box-shadow: 0 0 15px rgba(239, 68, 68, 0.6); }
+  .btn-warn   { background: linear-gradient(135deg, #f59e0b, #d97706); }
+  .btn-warn:hover   { box-shadow: 0 0 15px rgba(245, 158, 11, 0.6); }
+  .btn-msg    { background: linear-gradient(135deg, #06b6d4, #0891b2); }
+  .btn-msg:hover    { box-shadow: 0 0 15px rgba(6, 182, 212, 0.6); }
+  .btn-kick   { background: linear-gradient(135deg, #8b5cf6, #7c3aed); }
+  .btn-kick:hover   { box-shadow: 0 0 15px rgba(139, 92, 246, 0.6); }
+  .btn-ban    { background: linear-gradient(135deg, #1f2937, #111827); border: 1px solid #ef4444; }
+  .btn-ban:hover    { background: #ef4444; box-shadow: 0 0 15px rgba(239, 68, 68, 0.6); }
+
+  /* LOGS TABLE */
+  .logs-controls {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+  }
+
+  .logs-controls button {
+    padding: 10px 18px;
+    border: none;
+    border-radius: 10px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s;
+    color: #fff;
+  }
+
+  .logs-controls .btn-clear {
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+  }
+  .logs-controls .btn-refresh {
+    background: linear-gradient(135deg, #8b5cf6, #a855f7);
+  }
+  .logs-controls button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(168, 85, 247, 0.4);
+  }
+
+  .table-wrap {
+    background: rgba(20, 10, 40, 0.7);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(168, 85, 247, 0.25);
+    border-radius: 14px;
+    overflow: hidden;
+  }
+
+  table { width: 100%; border-collapse: collapse; }
+
+  th, td {
+    padding: 14px 16px;
+    text-align: left;
+    border-bottom: 1px solid rgba(168, 85, 247, 0.15);
+  }
+
+  th {
+    background: rgba(139, 92, 246, 0.2);
+    color: #c084fc;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  tr { transition: background 0.2s; }
+  tr:hover { background: rgba(168, 85, 247, 0.08); }
+
+  .action-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .action-lag  { background: rgba(239, 68, 68, 0.25); color: #ff6b6b; border: 1px solid rgba(239, 68, 68, 0.4); }
+  .action-kick { background: rgba(139, 92, 246, 0.25); color: #c084fc; border: 1px solid rgba(139, 92, 246, 0.4); }
+  .action-ban  { background: rgba(31, 41, 55, 0.6); color: #ff4d6d; border: 1px solid rgba(239, 68, 68, 0.4); }
+  .action-warn { background: rgba(245, 158, 11, 0.25); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4); }
+  .action-msg  { background: rgba(6, 182, 212, 0.25); color: #22d3ee; border: 1px solid rgba(6, 182, 212, 0.4); }
+
+  .target-name {
+    color: #c084fc;
+    font-weight: bold;
+  }
+
+  .admin-name {
+    color: #e9d5ff;
+    font-weight: 600;
+  }
+
+  .timestamp {
+    color: #a78bfa;
+    font-size: 13px;
+  }
+
+  /* Toast notification */
+  .toast {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    background: rgba(20, 10, 40, 0.95);
+    backdrop-filter: blur(15px);
+    border: 1px solid #a855f7;
+    border-radius: 12px;
+    padding: 15px 20px;
+    color: #fff;
+    box-shadow: 0 10px 40px rgba(168, 85, 247, 0.4);
+    animation: toastIn 0.4s ease, toastOut 0.4s ease 2.6s forwards;
+    z-index: 1000;
+    max-width: 320px;
+  }
+
+  @keyframes toastIn {
+    from { opacity: 0; transform: translateX(100px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+  @keyframes toastOut {
+    to { opacity: 0; transform: translateX(100px); }
+  }
+
+  .toast .toast-title {
+    color: #c084fc;
+    font-weight: bold;
+    margin-bottom: 4px;
+  }
+
+  .toast .toast-msg {
+    font-size: 13px;
+    color: #e9d5ff;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 8px; }
+  ::-webkit-scrollbar-track { background: #0a0514; }
+  ::-webkit-scrollbar-thumb { background: #8b5cf6; border-radius: 4px; }
+</style>
 </head>
 <body>
+<div class="container">
 
-<div class="toast" id="toast"></div>
+  <!-- LOGIN -->
+  <div id="login-screen">
+    <h1>🔐 Connexion Admin</h1>
+    <input type="text" id="admin-name" placeholder="👤 Votre nom d'admin">
+    <input type="password" id="admin-password" placeholder="🔑 Mot de passe">
+    <button onclick="login()">⚡ Se connecter</button>
+    <div id="login-error" class="error"></div>
+  </div>
 
-<div class="loader-modal-overlay" id="loaderModal">
-    <div class="loader-modal">
-        <h3>Copy Loader</h3>
-        <p class="sub">Paste this into any executor.</p>
-        <div class="code-block" id="loaderCodeBlock">
-            <span class="copy-hint">click to copy</span>
-            <span id="loaderCodeText"></span>
-        </div>
-        <div class="modal-actions">
-            <button class="btn" onclick="closeLoaderModal()">Close</button>
-            <button class="btn btn-primary" id="copyLoaderBtn">Copy</button>
-        </div>
+  <!-- PANEL -->
+  <div id="panel">
+    <div class="topbar">
+      <h1> Panel Admin — <span id="current-admin"></span></h1>
+      <button onclick="logout()">🚪 Déconnexion</button>
     </div>
-</div>
 
-<!-- ADMIN MODAL -->
-<div class="loader-modal-overlay" id="adminModal">
-    <div class="loader-modal">
-        <div id="adminLoginView">
-            <h3>🛡️ Admin Access</h3>
-            <p class="sub">Enter the admin password to continue.</p>
-            <input type="password" id="adminPasswordInput" class="admin-input" placeholder="Admin password…" autofocus />
-            <div class="modal-actions">
-                <button class="btn" onclick="closeAdminModal()">Cancel</button>
-                <button class="btn btn-primary" onclick="submitAdminLogin()">Unlock</button>
-            </div>
-            <div class="admin-error" id="adminError"></div>
-        </div>
-        <div id="adminDashboardView" style="display:none;">
-            <h3>🛡️ Admin Dashboard</h3>
-            <p class="sub">Manage active panel sessions.</p>
-            <div class="admin-session-list">
-                <table class="admin-session-table">
-                    <thead>
-                        <tr>
-                            <th>Session ID</th>
-                            <th>IP Address</th>
-                            <th>Created</th>
-                            <th style="text-align: right;">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody id="adminSessionList"></tbody>
-                </table>
-            </div>
-            <div class="modal-actions">
-                <button class="btn" onclick="closeAdminModal()">Close</button>
-            </div>
-        </div>
+    <h2>👥 Utilisateurs du panel</h2>
+    <div id="users-grid" class="users-grid"></div>
+
+    <h2>📋 Logs des actions</h2>
+    <div class="logs-controls">
+      <button class="btn-clear" onclick="clearLogs()">🗑️ Effacer les logs</button>
+      <button class="btn-refresh" onclick="loadLogs()">🔄 Rafraîchir</button>
     </div>
-</div>
-
-<div class="app" id="mainApp">
-    <header class="header">
-        <div class="header-left">
-            <span class="logo-main">Seyko Panel</span>
-            <span class="logo-sub">v3</span>
-            <span class="logout-link" id="logoutLink">⏻ logout</span>
-        </div>
-        <div class="header-actions">
-            <button class="copy-loader-btn" onclick="openAdminModal()" style="border-color: #4a3520; color: #fbbf24;">
-                <span class="icon">🛡️</span> Admin
-            </button>
-            <button class="copy-loader-btn" onclick="openLoaderModal()">
-                <span class="icon">📋</span> Copy loader
-            </button>
-            <div class="header-stats">
-                <span>🟢 <span class="num" id="onlineCount">0</span> online</span>
-                <span>⏱ <span class="num" id="refreshTimer">1s</span></span>
-            </div>
-        </div>
-    </header>
-
-    <div class="main">
-        <section class="players-section">
-            <div class="section-header">
-                <h2>👥 Players <span class="badge" id="totalBadge">0</span></h2>
-                <span class="last-update" id="lastUpdate">updating…</span>
-            </div>
-            <div class="search-bar">
-                <input type="text" id="searchInput" placeholder="Search by username, display name, or brainrot…" />
-            </div>
-            <div class="player-grid" id="playerGrid">
-                <div class="empty-state">
-                    <div class="icon">📡</div>
-                    <p>Waiting for clients…</p>
-                    <p class="sub">Execute the loader script to see players appear.</p>
-                </div>
-            </div>
-        </section>
-
-        <aside class="command-panel" id="commandPanel">
-            <div class="panel-title">🎮 Control <span class="target-name" id="targetName">—</span></div>
-            <div class="panel-sub"><span id="targetStatus">No player selected</span></div>
-
-            <div class="cmd-group">
-                <span class="cmd-label">Performance</span>
-                <div class="cmd-row">
-                    <div class="toggle-wrap disabled" id="toggleFps" data-cmd="fps_limit">
-                        <span class="label">FPS Limit</span>
-                        <div class="toggle-track"><span class="thumb"></span></div>
-                        <span class="status-text">OFF</span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="cmd-group">
-                <span class="cmd-label">Lag Engine</span>
-                <div class="cmd-row">
-                    <div class="toggle-wrap disabled" id="toggleLagN" data-cmd="lag_n">
-                        <span class="label">Lag (Normal)</span>
-                        <div class="toggle-track"><span class="thumb"></span></div>
-                        <span class="status-text">OFF</span>
-                    </div>
-                    <div class="toggle-wrap disabled" id="toggleLagC" data-cmd="lag_c">
-                        <span class="label">Lag (Carry)</span>
-                        <div class="toggle-track"><span class="thumb"></span></div>
-                        <span class="status-text">OFF</span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="cmd-group">
-                <span class="cmd-label">Actions</span>
-                <div class="cmd-btn-group">
-                    <button class="cmd-btn danger" id="btnKick" disabled>Kick</button>
-                    <button class="cmd-btn warning" id="btnCrash" disabled>Crash</button>
-                </div>
-            </div>
-
-            <div class="brainrot-section" id="brainrotSection">
-                <div class="brainrot-label">
-                    <span>🧠 BRAINROTS</span>
-                    <span class="count" id="brainrotCount">0 items</span>
-                </div>
-                <div class="brainrot-list" id="brainrotList">
-                    <div class="brainrot-empty">Select a player to see brainrots</div>
-                </div>
-            </div>
-        </aside>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Date / Heure</th>
+            <th>Admin</th>
+            <th>Action</th>
+            <th>Cible</th>
+          </tr>
+        </thead>
+        <tbody id="logs-body"></tbody>
+      </table>
     </div>
+  </div>
 </div>
 
 <script>
-    document.getElementById('logoutLink').addEventListener('click', function() {
-        fetch('/api/logout', { method: 'POST', credentials: 'include' }).then(() => { window.location.href = '/login'; }).catch(() => { window.location.href = '/login'; });
+  let currentAdmin = '';
+
+  async function login() {
+    const name = document.getElementById('admin-name').value.trim();
+    const password = document.getElementById('admin-password').value;
+    const err = document.getElementById('login-error');
+    err.textContent = '';
+    if (!name) { err.textContent = '⚠️ Entrez votre nom.'; return; }
+    try {
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password, adminName: name })
+      });
+      const data = await res.json();
+      if (data.success) {
+        currentAdmin = data.admin;
+        document.getElementById('current-admin').textContent = currentAdmin;
+        document.getElementById('login-screen').style.display = 'none';
+        document.getElementById('panel').style.display = 'block';
+        loadUsers();
+        loadLogs();
+      } else {
+        err.textContent = '❌ ' + (data.message || 'Échec');
+      }
+    } catch (e) { err.textContent = ' Erreur serveur'; }
+  }
+
+  function logout() {
+    currentAdmin = '';
+    document.getElementById('panel').style.display = 'none';
+    document.getElementById('login-screen').style.display = 'block';
+    document.getElementById('admin-password').value = '';
+  }
+
+  async function loadUsers() {
+    const res = await fetch('/api/users');
+    const users = await res.json();
+    const grid = document.getElementById('users-grid');
+    grid.innerHTML = '';
+    users.forEach((u, i) => {
+      const card = document.createElement('div');
+      card.className = 'user-card';
+      card.style.animationDelay = (i * 0.08) + 's';
+      card.innerHTML = `
+        <h3>${u.name}</h3>
+        <span class="role">${u.role}</span>
+        <div class="actions">
+          <button class="btn-lag"  onclick="doAction('${u.name}','lag')">⚡ Lag</button>
+          <button class="btn-warn" onclick="doAction('${u.name}','warn')">⚠️ Warn</button>
+          <button class="btn-msg"  onclick="doAction('${u.name}','msg')">💬 Msg</button>
+          <button class="btn-kick" onclick="doAction('${u.name}','kick')">👢 Kick</button>
+          <button class="btn-ban"  onclick="doAction('${u.name}','ban')">🚫 Ban</button>
+        </div>
+      `;
+      grid.appendChild(card);
     });
+  }
 
-    const API_BASE = window.location.origin;
-    const POLL_INTERVAL = 1000;
-    let players = new Map();
-    let selectedUserId = null;
-    let commandState = { fps_limit: false, lag_n: false, lag_c: false };
-    let toastTimeout = null;
-    let searchQuery = '';
+  async function doAction(target, action) {
+    try {
+      await fetch('/api/log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ admin: currentAdmin, action, target })
+      });
+      showToast(`✅ ${currentAdmin} a fait <b>${action.toUpperCase()}</b> sur <b>${target}</b>`);
+      loadLogs();
+    } catch (e) { console.error(e); }
+  }
 
-    const $ = (s) => document.querySelector(s);
-    const playerGrid = $('#playerGrid');
-    const onlineCount = $('#onlineCount');
-    const totalBadge = $('#totalBadge');
-    const lastUpdate = $('#lastUpdate');
-    const refreshTimer = $('#refreshTimer');
-    const targetName = $('#targetName');
-    const targetStatus = $('#targetStatus');
-    const toggleFps = $('#toggleFps');
-    const toggleLagN = $('#toggleLagN');
-    const toggleLagC = $('#toggleLagC');
-    const btnKick = $('#btnKick');
-    const btnCrash = $('#btnCrash');
-    const brainrotList = $('#brainrotList');
-    const brainrotCount = $('#brainrotCount');
-    const toast = $('#toast');
-    const searchInput = $('#searchInput');
-
-    function showToast(msg, icon = '✓') {
-        if (toastTimeout) clearTimeout(toastTimeout);
-        toast.innerHTML = `<span class="toast-icon">${icon}</span> ${msg}`;
-        toast.classList.add('show');
-        toastTimeout = setTimeout(() => toast.classList.remove('show'), 2800);
+  async function loadLogs() {
+    const res = await fetch('/api/logs');
+    const data = await res.json();
+    const tbody = document.getElementById('logs-body');
+    tbody.innerHTML = '';
+    if (data.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#a78bfa;padding:30px;">Aucun log pour le moment</td></tr>';
+      return;
     }
-
-    function openLoaderModal() {
-        document.getElementById('loaderCodeText').textContent = `loadstring(game:HttpGet("${API_BASE}/loader.lua"))()`;
-        $('#loaderModal').classList.add('open');
-    }
-    function closeLoaderModal() { $('#loaderModal').classList.remove('open'); }
-    $('#loaderModal').addEventListener('click', function(e) { if (e.target === this) closeLoaderModal(); });
-    $('#copyLoaderBtn').addEventListener('click', function() {
-        const text = document.getElementById('loaderCodeText').textContent;
-        navigator.clipboard.writeText(text).then(() => { showToast('Loader code copied!', '📋'); closeLoaderModal(); }).catch(() => {
-            const range = document.createRange(); const sel = window.getSelection(); const el = document.getElementById('loaderCodeText');
-            range.selectNodeContents(el); sel.removeAllRanges(); sel.addRange(range); document.execCommand('copy');
-            showToast('Loader code copied!', '📋'); closeLoaderModal();
-        });
+    data.forEach(l => {
+      const tr = document.createElement('tr');
+      const date = new Date(l.timestamp).toLocaleString('fr-FR');
+      tr.innerHTML = `
+        <td style="color:#a78bfa;">#${l.id}</td>
+        <td class="timestamp">${date}</td>
+        <td class="admin-name">${l.admin}</td>
+        <td><span class="action-badge action-${l.action}">${l.action}</span></td>
+        <td class="target-name">🎯 ${l.target}</td>
+      `;
+      tbody.appendChild(tr);
     });
-    document.getElementById('loaderCodeBlock').addEventListener('click', function() { document.getElementById('copyLoaderBtn').click(); });
+  }
 
-    async function fetchPlayers() {
-        try {
-            const res = await fetch(API_BASE + '/api/players', { credentials: 'include' });
-            if (res.status === 401) { window.location.href = '/login'; return []; }
-            if (!res.ok) throw new Error('Server error');
-            const data = await res.json();
-            return data.players || [];
-        } catch (e) { return []; }
-    }
+  async function clearLogs() {
+    if (!confirm('🗑️ Effacer tous les logs ?')) return;
+    await fetch('/api/logs', { method: 'DELETE' });
+    loadLogs();
+    showToast('️ Logs effacés');
+  }
 
-    async function sendCommand(userId, payload) {
-        try {
-            const res = await fetch(API_BASE + '/api/command', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ user_id: userId, ...payload }) });
-            if (res.status === 401) { window.location.href = '/login'; return null; }
-            if (!res.ok) throw new Error('Command failed');
-            return await res.json();
-        } catch (e) { showToast('Command failed: ' + e.message, '✗'); return null; }
-    }
+  function showToast(msg) {
+    const existing = document.querySelector('.toast');
+    if (existing) existing.remove();
+    const toast = document.createElement('div');
+    toast.className = 'toast';
+    toast.innerHTML = `<div class="toast-title">📋 Action enregistrée</div><div class="toast-msg">${msg}</div>`;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+  }
 
-    function renderPlayers() {
-        const entries = Array.from(players.values());
-        let filtered = entries;
-        if (searchQuery.trim() !== '') {
-            const q = searchQuery.trim().toLowerCase();
-            filtered = entries.filter(p => {
-                const matchUsername = p.username && p.username.toLowerCase().includes(q);
-                const matchDisplay = p.display_name && p.display_name.toLowerCase().includes(q);
-                const matchBrainrot = p.brainrots && p.brainrots.some(b => b.title && b.title.toLowerCase().includes(q));
-                return matchUsername || matchDisplay || matchBrainrot;
-            });
-        }
-        const online = filtered.filter(p => p.online);
-        const offline = filtered.filter(p => !p.online);
-        onlineCount.textContent = online.length;
-        totalBadge.textContent = entries.length;
-
-        if (filtered.length === 0) {
-            playerGrid.innerHTML = `<div class="empty-state"><div class="icon">🔍</div><p>No players match your search</p><p class="sub">Try a different keyword</p></div>`;
-            return;
-        }
-        const sorted = [...online, ...offline];
-        let html = '';
-        for (const p of sorted) {
-            const isSelected = (p.user_id === selectedUserId);
-            const statusClass = p.online ? 'online' : 'offline';
-            const avatarUrl = p.avatar_url || '';
-            const initial = (p.username || '?')[0].toUpperCase();
-            html += `<div class="player-card ${statusClass} ${isSelected ? 'selected' : ''}" data-userid="${p.user_id}" onclick="selectPlayer('${p.user_id}')">
-                <div class="player-avatar">${avatarUrl ? `<img src="${avatarUrl}" alt="${p.username}" loading="lazy" onerror="this.style.display='none'" />` : ''}<div class="fallback" style="${avatarUrl ? 'display:none' : ''}">${initial}</div></div>
-                <div class="player-info"><div class="player-name">${p.username || 'Unknown'}</div><div class="player-meta"><span class="tag">${p.executor || '?'}</span><span class="tag">${p.game_name ? p.game_name.substring(0, 14) : '?'}</span></div></div>
-                <div class="player-status ${p.online ? '' : 'offline'}"></div>
-            </div>`;
-        }
-        playerGrid.innerHTML = html;
-        updateCommandPanel();
-    }
-
-    function updateCommandPanel() {
-        const selected = selectedUserId ? players.get(selectedUserId) : null;
-        if (selected && selected.online) {
-            targetName.textContent = selected.username || 'Player';
-            targetStatus.textContent = '🟢 Online · ' + (selected.executor || 'unknown');
-            targetStatus.style.color = '#86efac';
-            toggleFps.classList.remove('disabled'); toggleLagN.classList.remove('disabled'); toggleLagC.classList.remove('disabled');
-            btnKick.disabled = false; btnCrash.disabled = false;
-            setToggleState(toggleFps, commandState.fps_limit || false);
-            setToggleState(toggleLagN, commandState.lag_n || false);
-            setToggleState(toggleLagC, commandState.lag_c || false);
-            renderBrainrots(selected.brainrots || []);
-        } else if (selected && !selected.online) {
-            targetName.textContent = selected.username || 'Player';
-            targetStatus.textContent = '⛔ Offline'; targetStatus.style.color = '#6b7a8f';
-            toggleFps.classList.add('disabled'); toggleLagN.classList.add('disabled'); toggleLagC.classList.add('disabled');
-            btnKick.disabled = true; btnCrash.disabled = true;
-            renderBrainrots(selected.brainrots || []);
-        } else {
-            targetName.textContent = '—'; targetStatus.textContent = 'No player selected'; targetStatus.style.color = '#6b7a8f';
-            toggleFps.classList.add('disabled'); toggleLagN.classList.add('disabled'); toggleLagC.classList.add('disabled');
-            btnKick.disabled = true; btnCrash.disabled = true; renderBrainrots([]);
-        }
-    }
-
-    function setToggleState(el, active) {
-        if (active) { el.classList.add('active'); el.querySelector('.status-text').textContent = 'ON'; }
-        else { el.classList.remove('active'); el.querySelector('.status-text').textContent = 'OFF'; }
-    }
-
-    function renderBrainrots(brainrots) {
-        brainrotCount.textContent = (brainrots.length || 0) + ' items';
-        if (!brainrots || brainrots.length === 0) { brainrotList.innerHTML = `<div class="brainrot-empty">No brainrots found</div>`; return; }
-        let html = '';
-        for (const b of brainrots) { html += `<div class="brainrot-item"><span class="title">${b.title || 'Unknown'}</span><span class="cash">${b.cash || '?'}</span></div>`; }
-        brainrotList.innerHTML = html;
-    }
-
-    function selectPlayer(userId) { selectedUserId = userId; fetchPlayerCommandState(userId); renderPlayers(); updateCommandPanel(); }
-
-    async function fetchPlayerCommandState(userId) {
-        try {
-            const res = await fetch(API_BASE + '/api/command_state?user_id=' + encodeURIComponent(userId), { credentials: 'include' });
-            if (res.status === 401) { window.location.href = '/login'; return; }
-            if (!res.ok) return;
-            const data = await res.json();
-            if (data) { commandState.fps_limit = data.fps_limit || false; commandState.lag_n = data.lag_n || false; commandState.lag_c = data.lag_c || false; updateCommandPanel(); }
-        } catch (e) { /* ignore */ }
-    }
-
-    function setupToggle(el, cmdKey) {
-        el.addEventListener('click', function() {
-            if (this.classList.contains('disabled')) return;
-            if (!selectedUserId) { showToast('Select a player first', '⚠️'); return; }
-            const player = players.get(selectedUserId);
-            if (!player || !player.online) { showToast('Player is offline', '⚠️'); return; }
-            const current = commandState[cmdKey] || false;
-            const newState = !current;
-            commandState[cmdKey] = newState;
-            setToggleState(this, newState);
-            sendCommand(selectedUserId, { [cmdKey]: newState }).then(() => { showToast(`${cmdKey} → ${newState ? 'ON' : 'OFF'}`, '✓'); }).catch(() => { commandState[cmdKey] = current; setToggleState(this, current); });
-        });
-    }
-
-    setupToggle(toggleFps, 'fps_limit');
-    setupToggle(toggleLagN, 'lag_n');
-    setupToggle(toggleLagC, 'lag_c');
-
-    btnKick.addEventListener('click', function() {
-        if (this.disabled) return;
-        if (!selectedUserId) { showToast('Select a player', '⚠️'); return; }
-        const player = players.get(selectedUserId);
-        if (!player || !player.online) { showToast('Player offline', '⚠️'); return; }
-        if (!confirm(`Kick ${player.username || 'player'}?`)) return;
-        sendCommand(selectedUserId, { kick: true }).then(() => showToast(`Kicked ${player.username}`, '🚪'));
-    });
-
-    btnCrash.addEventListener('click', function() {
-        if (this.disabled) return;
-        if (!selectedUserId) { showToast('Select a player', '⚠️'); return; }
-        const player = players.get(selectedUserId);
-        if (!player || !player.online) { showToast('Player offline', '⚠️'); return; }
-        if (!confirm(`Crash ${player.username || 'player'}?`)) return;
-        sendCommand(selectedUserId, { crash: true }).then(() => showToast(`Crash sent to ${player.username}`, '💥'));
-    });
-
-    let pollCount = 0;
-    async function poll() {
-        const data = await fetchPlayers();
-        const newMap = new Map();
-        for (const p of data) {
-            p.online = (Date.now() - (p.lastHeartbeat || 0)) < 15000;
-            if (players.has(p.user_id)) { p._cmdState = players.get(p.user_id)._cmdState || {}; }
-            else { p._cmdState = { fps_limit: false, lag_n: false, lag_c: false }; }
-            newMap.set(p.user_id, p);
-        }
-        players = newMap;
-        if (selectedUserId && !players.has(selectedUserId)) selectedUserId = null;
-        renderPlayers(); updateCommandPanel();
-        lastUpdate.textContent = 'updated ' + new Date().toLocaleTimeString();
-        refreshTimer.textContent = (pollCount + 1) + 's';
-        pollCount = (pollCount + 1) % 999;
-    }
-
-    searchInput.addEventListener('input', function() { searchQuery = this.value; renderPlayers(); });
-    poll();
-    setInterval(poll, POLL_INTERVAL);
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) poll(); });
-    setTimeout(() => { if (!selectedUserId) { const first = Array.from(players.values()).find(p => p.online); if (first) selectPlayer(first.user_id); } }, 2000);
-
-    // ══════════════════════════════════════════════════════════
-    // ADMIN MODAL LOGIC (mot de passe admin demandé à chaque fois)
-    // ══════════════════════════════════════════════════════════
-    let currentAdminPassword = '';
-
-    async function openAdminModal() {
-        currentAdminPassword = '';
-        document.getElementById('adminPasswordInput').value = '';
-        document.getElementById('adminError').textContent = '';
-        document.getElementById('adminLoginView').style.display = 'block';
-        document.getElementById('adminDashboardView').style.display = 'none';
-        document.getElementById('adminModal').classList.add('open');
-        setTimeout(() => document.getElementById('adminPasswordInput').focus(), 100);
-    }
-
-    function closeAdminModal() {
-        document.getElementById('adminModal').classList.remove('open');
-        currentAdminPassword = '';
-        document.getElementById('adminPasswordInput').value = '';
-    }
-
-    async function submitAdminLogin() {
-        const pwd = document.getElementById('adminPasswordInput').value.trim();
-        const err = document.getElementById('adminError');
-        if (!pwd) { err.textContent = 'Please enter the admin password.'; return; }
-        
-        try {
-            const res = await fetch('/api/admin/sessions', { 
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' }, 
-                credentials: 'include',
-                body: JSON.stringify({ adminPassword: pwd }) 
-            });
-            if (res.status === 401) {
-                err.textContent = 'Incorrect admin password.';
-                document.getElementById('adminPasswordInput').value = '';
-                document.getElementById('adminPasswordInput').focus();
-                return;
-            }
-            if (!res.ok) {
-                err.textContent = 'Access denied.';
-                return;
-            }
-            currentAdminPassword = pwd;
-            document.getElementById('adminLoginView').style.display = 'none';
-            document.getElementById('adminDashboardView').style.display = 'block';
-            await loadSessions();
-        } catch (e) {
-            err.textContent = 'Network error. Try again.';
-        }
-    }
-
-    async function loadSessions() {
-        try {
-            const res = await fetch('/api/admin/sessions', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({ adminPassword: currentAdminPassword })
-            });
-            if (res.status === 401) {
-                openAdminModal();
-                return;
-            }
-            const data = await res.json();
-            const tbody = document.getElementById('adminSessionList');
-            tbody.innerHTML = '';
-            
-            if (!data.sessions || data.sessions.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="4" style="padding: 12px; text-align: center; color: #6b7a8f;">No active sessions.</td></tr>';
-                return;
-            }
-            
-            for (const s of data.sessions) {
-                const date = new Date(s.createdAt).toLocaleString();
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td style="font-family: monospace; font-size: 11px;">${s.id.substring(0, 8)}...</td>
-                    <td>${s.ip}</td>
-                    <td>${date}</td>
-                    <td style="text-align: right;">
-                        ${s.isSelf ? '<span class="admin-self-badge">YOU</span>' : 
-                        `<button class="cmd-btn danger" style="padding: 4px 10px; font-size: 11px;" onclick="disconnectSession('${s.id}')">Disconnect</button>`}
-                    </td>
-                `;
-                tbody.appendChild(row);
-            }
-        } catch (e) {
-            console.error('Failed to load sessions', e);
-        }
-    }
-
-    async function disconnectSession(sessionId) {
-        if (!confirm('Are you sure you want to disconnect this user?')) return;
-        try {
-            const res = await fetch('/api/admin/disconnect', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({ sessionId, adminPassword: currentAdminPassword })
-            });
-            if (res.ok) {
-                showToast('User disconnected successfully', '🚪');
-                loadSessions();
-            } else {
-                const data = await res.json();
-                showToast(data.error || 'Failed to disconnect', '✗');
-            }
-        } catch (e) {
-            showToast('Network error', '✗');
-        }
-    }
-
-    document.getElementById('adminPasswordInput').addEventListener('keydown', (e) => { 
-        if (e.key === 'Enter') submitAdminLogin(); 
-    });
+  // Enter pour se connecter
+  document.getElementById('admin-password').addEventListener('keypress', e => {
+    if (e.key === 'Enter') login();
+  });
 </script>
 </body>
 </html>
