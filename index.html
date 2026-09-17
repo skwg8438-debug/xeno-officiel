@@ -593,57 +593,39 @@
     }
 
     function updateSpecScreen(data) {
-        if (data && data.screenshot && !data.screenshot.startsWith("ERROR:")) {
+        if (data && data.screenshot) {
+            // Image reçue avec succès
             specScreenContainer.innerHTML = `<img src="${data.screenshot}" alt="Player screen" style="max-width: 100%; border-radius: 8px;" />`;
             specStatusText.textContent = 'Live Screen · Receiving every 3s';
-        } else if (data && data.telemetry) {
-            const t = data.telemetry;
+        } else if (data && data.error) {
+            // Erreur détectée
+            let errorMsg = data.error;
+            let icon = '⚠️';
+            
+            if (errorMsg.includes('NOT_SUPPORTED')) {
+                icon = '❌';
+                errorMsg = `Screenshot NOT supported by ${errorMsg.split(': ')[1] || 'this executor'}`;
+            } else if (errorMsg.includes('TOO_LARGE')) {
+                icon = '📦';
+                errorMsg = `Image too large (${errorMsg.split(': ')[1] || 'unknown'} bytes)`;
+            }
+            
             specScreenContainer.innerHTML = `
-                <div style="padding: 24px; width: 100%; text-align: left; font-family: 'Fira Code', monospace; font-size: 13px; color: #86efac;">
-                    <div style="margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #1a232e;">
-                        <span style="color: #fbbf24;">⚠️ SCREENSHOT BLOCKED BY EXECUTOR</span><br>
-                        <span style="color: #9aabb8; font-size: 12px;">Falling back to live telemetry data (100% reliable)...</span>
-                    </div>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-                        <div style="background: #0d1117; padding: 12px; border-radius: 8px; border: 1px solid #1a232e;">
-                            <div style="color: #6b7a8f; font-size: 10px; text-transform: uppercase; margin-bottom: 4px;">📍 Position</div>
-                            <div style="color: #e8edf5;">${t.position || 'Unknown'}</div>
-                        </div>
-                        <div style="background: #0d1117; padding: 12px; border-radius: 8px; border: 1px solid #1a232e;">
-                            <div style="color: #6b7a8f; font-size: 10px; text-transform: uppercase; margin-bottom: 4px;">❤️ Health</div>
-                            <div style="color: #e8edf5;">${t.health || 'Unknown'}</div>
-                        </div>
-                        <div style="background: #0d1117; padding: 12px; border-radius: 8px; border: 1px solid #1a232e;">
-                            <div style="color: #6b7a8f; font-size: 10px; text-transform: uppercase; margin-bottom: 4px;">💰 Cash / Value</div>
-                            <div style="color: #fbbf24;">${t.cash || 'Unknown'}</div>
-                        </div>
-                        <div style="background: #0d1117; padding: 12px; border-radius: 8px; border: 1px solid #1a232e;">
-                            <div style="color: #6b7a8f; font-size: 10px; text-transform: uppercase; margin-bottom: 4px;">📡 Ping</div>
-                            <div style="color: #e8edf5;">${t.ping || 'Unknown'} ms</div>
-                        </div>
-                        <div style="background: #0d1117; padding: 12px; border-radius: 8px; border: 1px solid #1a232e; grid-column: 1 / -1;">
-                            <div style="color: #6b7a8f; font-size: 10px; text-transform: uppercase; margin-bottom: 4px;">💻 Executor</div>
-                            <div style="color: #a5b4fc;">${t.executor || 'Unknown'}</div>
-                        </div>
-                    </div>
+                <div style="padding: 40px; text-align: center;">
+                    <div style="font-size: 64px; margin-bottom: 16px;">${icon}</div>
+                    <p style="color: #f87171; font-size: 16px; font-weight: 600; margin-bottom: 8px;">${errorMsg}</p>
+                    <p style="color: #9aabb8; font-size: 13px;">This executor does not support screen capture.</p>
+                    <p style="color: #6b7a8f; font-size: 12px; margin-top: 12px;">Try: Solara, Synapse X, or Script-Ware</p>
                 </div>
             `;
-            specStatusText.textContent = 'Live Telemetry · Screenshot blocked by executor limits';
-        } else if (data && data.screenshot && data.screenshot.startsWith("ERROR:")) {
-             specScreenContainer.innerHTML = `
-                <div style="padding: 24px; text-align: center; color: #f87171;">
-                    <div style="font-size: 32px; margin-bottom: 12px;">⚠️</div>
-                    <p>${data.screenshot}</p>
-                    <p class="sub" style="color: #9aabb8; margin-top: 8px;">The executor cannot send images this large.</p>
-                </div>
-            `;
-            specStatusText.textContent = 'Failed: Image too large for executor';
+            specStatusText.textContent = 'Screenshot not supported';
         } else {
+            // En attente
             specScreenContainer.innerHTML = `
                 <div class="spec-screen-placeholder">
                     <div class="icon">📷</div>
-                    <p>Waiting for data...</p>
-                    <p class="sub">The player might be offline or executor is blocking requests.</p>
+                    <p>Waiting for screenshot...</p>
+                    <p class="sub">Connecting to player client...</p>
                 </div>
             `;
             specStatusText.textContent = 'Waiting for data...';
