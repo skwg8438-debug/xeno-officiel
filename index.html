@@ -83,9 +83,6 @@
         .cmd-btn.warning:hover:not(:disabled) { background: #3d2a1a; border-color: #7f5528; }
         .cmd-btn.primary { background: #1a1f3a; border-color: #2a3360; color: #a5b4fc; }
         .cmd-btn.primary:hover:not(:disabled) { background: #252d55; border-color: #4a5a9a; }
-        .cmd-btn.spec { background: #1a2a1a; border-color: #2a4030; color: #86efac; }
-        .cmd-btn.spec:hover:not(:disabled) { background: #2a3a2a; border-color: #4a6a5a; }
-        .cmd-btn.spec.active { background: #22c55e; border-color: #16a34a; color: #fff; }
         .cmd-btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none !important; }
         .cmd-btn:active:not(:disabled) { transform: scale(0.95); }
         .cmd-btn-group { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -127,52 +124,11 @@
         .admin-session-table td { padding: 8px; border-bottom: 1px solid #1a232e; }
         .admin-session-list { max-height: 300px; overflow-y: auto; background: #0b0d11; border-radius: 10px; border: 1px solid #1a232e; padding: 8px; margin-bottom: 14px; }
         .admin-self-badge { color: #fbbf24; font-size: 10px; background: #2a1f15; padding: 2px 6px; border-radius: 4px; border: 1px solid #4a3520; }
-
-        /* Spectate Modal Styles */
-        .spec-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); z-index: 2000; display: none; align-items: center; justify-content: center; padding: 20px; }
-        .spec-modal.open { display: flex; }
-        .spec-modal-content { background: #12171f; border: 1px solid #2a3646; border-radius: 16px; padding: 20px; max-width: 900px; width: 100%; max-height: 90vh; overflow-y: auto; box-shadow: 0 24px 64px rgba(0,0,0,0.8); }
-        .spec-modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #1a232e; }
-        .spec-modal-header h3 { font-size: 16px; color: #86efac; }
-        .spec-modal-close { background: #1f2a36; border: 1px solid #2a3646; color: #c8d2df; padding: 6px 14px; border-radius: 20px; cursor: pointer; font-size: 12px; font-weight: 600; transition: all 0.2s; }
-        .spec-modal-close:hover { background: #3d1a2a; border-color: #7f2d3f; color: #f87171; }
-        .spec-screen-container { background: #0b0d11; border: 1px solid #1a232e; border-radius: 10px; overflow: hidden; position: relative; min-height: 400px; display: flex; align-items: center; justify-content: center; }
-        .spec-screen-container img { width: 100%; height: auto; display: block; border-radius: 8px; }
-        .spec-screen-placeholder { text-align: center; color: #6b7a8f; padding: 40px; }
-        .spec-screen-placeholder .icon { font-size: 48px; margin-bottom: 12px; opacity: 0.3; }
-        .spec-screen-placeholder p { font-size: 14px; margin-bottom: 4px; }
-        .spec-screen-placeholder .sub { font-size: 12px; color: #4b5a6e; }
-        .spec-status { display: flex; gap: 12px; align-items: center; margin-top: 12px; font-size: 12px; color: #9aabb8; }
-        .spec-status .dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; animation: pulse-dot 1.8s ease-in-out infinite; }
-        .spec-status .info { flex: 1; }
     </style>
 </head>
 <body>
 
 <div class="toast" id="toast"></div>
-
-<!-- Spectate Modal -->
-<div class="spec-modal" id="specModal">
-    <div class="spec-modal-content">
-        <div class="spec-modal-header">
-            <h3>👁️ Spectating: <span id="specPlayerName">—</span></h3>
-            <button class="spec-modal-close" onclick="closeSpecModal()">✕ Close</button>
-        </div>
-        <div class="spec-screen-container" id="specScreenContainer">
-            <div class="spec-screen-placeholder">
-                <div class="icon">📡</div>
-                <p>Waiting for data...</p>
-                <p class="sub">Connecting to player client...</p>
-            </div>
-        </div>
-        <div class="spec-status">
-            <div class="dot"></div>
-            <div class="info">
-                <span id="specStatusText">Connecting...</span>
-            </div>
-        </div>
-    </div>
-</div>
 
 <div class="loader-modal-overlay" id="loaderModal">
     <div class="loader-modal">
@@ -300,7 +256,6 @@
                 <div class="cmd-btn-group">
                     <button class="cmd-btn danger" id="btnKick" disabled>Kick</button>
                     <button class="cmd-btn warning" id="btnCrash" disabled>Crash</button>
-                    <button class="cmd-btn spec" id="btnSpec" disabled>👁 Spec</button>
                 </div>
             </div>
 
@@ -326,10 +281,9 @@
     const POLL_INTERVAL = 1000;
     let players = new Map();
     let selectedUserId = null;
-    let commandState = { fps_limit: false, lag_n: false, lag_c: false, spectate: false };
+    let commandState = { fps_limit: false, lag_n: false, lag_c: false };
     let toastTimeout = null;
     let searchQuery = '';
-    let specPollInterval = null;
 
     const $ = (s) => document.querySelector(s);
     const playerGrid = $('#playerGrid');
@@ -344,15 +298,10 @@
     const toggleLagC = $('#toggleLagC');
     const btnKick = $('#btnKick');
     const btnCrash = $('#btnCrash');
-    const btnSpec = $('#btnSpec');
     const brainrotList = $('#brainrotList');
     const brainrotCount = $('#brainrotCount');
     const toast = $('#toast');
     const searchInput = $('#searchInput');
-    const specModal = $('#specModal');
-    const specScreenContainer = $('#specScreenContainer');
-    const specPlayerName = $('#specPlayerName');
-    const specStatusText = $('#specStatusText');
 
     function showToast(msg, icon = '✓') {
         if (toastTimeout) clearTimeout(toastTimeout);
@@ -441,33 +390,21 @@
             targetStatus.textContent = '🟢 Online · ' + (selected.executor || 'unknown');
             targetStatus.style.color = '#86efac';
             toggleFps.classList.remove('disabled'); toggleLagN.classList.remove('disabled'); toggleLagC.classList.remove('disabled');
-            btnKick.disabled = false; btnCrash.disabled = false; btnSpec.disabled = false;
+            btnKick.disabled = false; btnCrash.disabled = false;
             setToggleState(toggleFps, commandState.fps_limit || false);
             setToggleState(toggleLagN, commandState.lag_n || false);
             setToggleState(toggleLagC, commandState.lag_c || false);
-            
-            if (commandState.spectate) {
-                btnSpec.classList.add('active');
-                btnSpec.innerHTML = '👁 Spec ON';
-            } else {
-                btnSpec.classList.remove('active');
-                btnSpec.innerHTML = '👁 Spec';
-            }
-            
             renderBrainrots(selected.brainrots || []);
         } else if (selected && !selected.online) {
             targetName.textContent = selected.username || 'Player';
             targetStatus.textContent = '⛔ Offline'; targetStatus.style.color = '#6b7a8f';
             toggleFps.classList.add('disabled'); toggleLagN.classList.add('disabled'); toggleLagC.classList.add('disabled');
-            btnKick.disabled = true; btnCrash.disabled = true; btnSpec.disabled = true;
-            btnSpec.classList.remove('active'); btnSpec.innerHTML = '👁 Spec';
+            btnKick.disabled = true; btnCrash.disabled = true;
             renderBrainrots(selected.brainrots || []);
         } else {
             targetName.textContent = '—'; targetStatus.textContent = 'No player selected'; targetStatus.style.color = '#6b7a8f';
             toggleFps.classList.add('disabled'); toggleLagN.classList.add('disabled'); toggleLagC.classList.add('disabled');
-            btnKick.disabled = true; btnCrash.disabled = true; btnSpec.disabled = true;
-            btnSpec.classList.remove('active'); btnSpec.innerHTML = '👁 Spec';
-            renderBrainrots([]);
+            btnKick.disabled = true; btnCrash.disabled = true; renderBrainrots([]);
         }
     }
 
@@ -492,13 +429,7 @@
             if (res.status === 401) { window.location.href = '/login'; return; }
             if (!res.ok) return;
             const data = await res.json();
-            if (data) { 
-                commandState.fps_limit = data.fps_limit || false; 
-                commandState.lag_n = data.lag_n || false; 
-                commandState.lag_c = data.lag_c || false; 
-                commandState.spectate = data.spectate || false;
-                updateCommandPanel(); 
-            }
+            if (data) { commandState.fps_limit = data.fps_limit || false; commandState.lag_n = data.lag_n || false; commandState.lag_c = data.lag_c || false; updateCommandPanel(); }
         } catch (e) { /* ignore */ }
     }
 
@@ -538,121 +469,6 @@
         sendCommand(selectedUserId, { crash: true }).then(() => showToast(`Crash sent to ${player.username}`, '💥'));
     });
 
-    btnSpec.addEventListener('click', function() {
-        if (this.disabled) return;
-        if (!selectedUserId) { showToast('Select a player', '⚠️'); return; }
-        const player = players.get(selectedUserId);
-        if (!player || !player.online) { showToast('Player offline', '⚠️'); return; }
-        
-        const isCurrentlySpectating = commandState.spectate;
-        
-        if (isCurrentlySpectating) {
-            commandState.spectate = false;
-            btnSpec.classList.remove('active');
-            btnSpec.innerHTML = '👁 Spec';
-            sendCommand(selectedUserId, { spectate: false }).then(() => {
-                showToast(`Stopped spectating ${player.username}`, '👁');
-                closeSpecModal();
-            });
-        } else {
-            commandState.spectate = true;
-            btnSpec.classList.add('active');
-            btnSpec.innerHTML = '👁 Spec ON';
-            sendCommand(selectedUserId, { spectate: true }).then(() => {
-                showToast(`Spectating ${player.username}`, '👁');
-                openSpecModal(player.username);
-            });
-        }
-    });
-
-    function openSpecModal(playerName) {
-        specPlayerName.textContent = playerName;
-        specModal.classList.add('open');
-        startSpecPolling();
-    }
-
-    function closeSpecModal() {
-        specModal.classList.remove('open');
-        stopSpecPolling();
-        if (selectedUserId && commandState.spectate) {
-            commandState.spectate = false;
-            btnSpec.classList.remove('active');
-            btnSpec.innerHTML = '👁 Spec';
-            sendCommand(selectedUserId, { spectate: false });
-        }
-    }
-
-    async function fetchSpecData(userId) {
-        try {
-            const res = await fetch(API_BASE + '/api/screenshot?user_id=' + encodeURIComponent(userId), { credentials: 'include' });
-            if (!res.ok) return null;
-            return await res.json();
-        } catch (e) {
-            return null;
-        }
-    }
-
-    function updateSpecScreen(data) {
-        if (data && data.screenshot) {
-            // Image reçue avec succès
-            specScreenContainer.innerHTML = `<img src="${data.screenshot}" alt="Player screen" style="max-width: 100%; border-radius: 8px;" />`;
-            specStatusText.textContent = 'Live Screen · Receiving every 3s';
-        } else if (data && data.error) {
-            // Erreur détectée
-            let errorMsg = data.error;
-            let icon = '⚠️';
-            
-            if (errorMsg.includes('NOT_SUPPORTED')) {
-                icon = '❌';
-                errorMsg = `Screenshot NOT supported by ${errorMsg.split(': ')[1] || 'this executor'}`;
-            } else if (errorMsg.includes('TOO_LARGE')) {
-                icon = '📦';
-                errorMsg = `Image too large (${errorMsg.split(': ')[1] || 'unknown'} bytes)`;
-            }
-            
-            specScreenContainer.innerHTML = `
-                <div style="padding: 40px; text-align: center;">
-                    <div style="font-size: 64px; margin-bottom: 16px;">${icon}</div>
-                    <p style="color: #f87171; font-size: 16px; font-weight: 600; margin-bottom: 8px;">${errorMsg}</p>
-                    <p style="color: #9aabb8; font-size: 13px;">This executor does not support screen capture.</p>
-                    <p style="color: #6b7a8f; font-size: 12px; margin-top: 12px;">Try: Solara, Synapse X, or Script-Ware</p>
-                </div>
-            `;
-            specStatusText.textContent = 'Screenshot not supported';
-        } else {
-            // En attente
-            specScreenContainer.innerHTML = `
-                <div class="spec-screen-placeholder">
-                    <div class="icon">📷</div>
-                    <p>Waiting for screenshot...</p>
-                    <p class="sub">Connecting to player client...</p>
-                </div>
-            `;
-            specStatusText.textContent = 'Waiting for data...';
-        }
-    }
-
-    function startSpecPolling() {
-        if (specPollInterval) clearInterval(specPollInterval);
-        updateSpecScreen(null);
-        specPollInterval = setInterval(async () => {
-            if (!selectedUserId) return;
-            const data = await fetchSpecData(selectedUserId);
-            updateSpecScreen(data);
-        }, 3000);
-    }
-
-    function stopSpecPolling() {
-        if (specPollInterval) {
-            clearInterval(specPollInterval);
-            specPollInterval = null;
-        }
-    }
-
-    specModal.addEventListener('click', function(e) {
-        if (e.target === this) closeSpecModal();
-    });
-
     let pollCount = 0;
     async function poll() {
         const data = await fetchPlayers();
@@ -660,7 +476,7 @@
         for (const p of data) {
             p.online = (Date.now() - (p.lastHeartbeat || 0)) < 15000;
             if (players.has(p.user_id)) { p._cmdState = players.get(p.user_id)._cmdState || {}; }
-            else { p._cmdState = { fps_limit: false, lag_n: false, lag_c: false, spectate: false }; }
+            else { p._cmdState = { fps_limit: false, lag_n: false, lag_c: false }; }
             newMap.set(p.user_id, p);
         }
         players = newMap;
@@ -678,7 +494,7 @@
     setTimeout(() => { if (!selectedUserId) { const first = Array.from(players.values()).find(p => p.online); if (first) selectPlayer(first.user_id); } }, 2000);
 
     // ══════════════════════════════════════════════════════════
-    // ADMIN MODAL LOGIC
+    // ADMIN MODAL LOGIC (mot de passe admin demandé à chaque fois)
     // ══════════════════════════════════════════════════════════
     let currentAdminPassword = '';
 
